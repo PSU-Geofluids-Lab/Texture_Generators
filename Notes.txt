@@ -1,0 +1,29 @@
+https://github.com/EAGG-UF/MF
+https://www.sciencedirect.com/science/article/pii/S0264127523010201
+
+
+https://www.tandfonline.com/doi/full/10.1080/14786435.2020.1790053
+https://www.sciencedirect.com/science/article/pii/S0093641322001550
+https://github.com/mbuze/PyAPD
+https://github.com/DPBourne/Laguerre-Polycrystalline-Microstructures
+
+https://www.sciencedirect.com/science/article/pii/S2352711020303083
+
+
+Other generators : 
+https://porespy.org/
+https://github.com/materialsinnovation/pymks
+https://docs.microstructpy.org/en/latest/
+https://link.springer.com/article/10.1007/s40192-023-00340-4
+https://arobertson38.github.io/MICRO2D/
+
+https://arxiv.org/pdf/2412.05168
+
+Represetnation -- 
+
+https://caam37830.github.io/book/05_graphs/spectral.html
+
+Methods -- 
+https://pysal.org/spaghetti/
+
+
