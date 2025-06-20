@@ -1,0 +1,3 @@
+!pip install vtk
+!pip install porespy
+!pip install numpy-stl
