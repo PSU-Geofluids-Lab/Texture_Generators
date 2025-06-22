@@ -2,3 +2,5 @@
 !pip install porespy
 !pip install numpy-stl
 !pip install pypardiso
+!pip install PyWavelets
+!pip install numpy-hilbert-curve

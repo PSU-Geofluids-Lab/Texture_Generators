@@ -16,7 +16,7 @@ class ImagePlotter:
             plt.show()
 
     @staticmethod
-    def plot_Nofrills(data, title='Generated Texture', cmap='viridis', save_path=None):
+    def plot_Nofrills(data, cmap='viridis', save_path=None):
         plt.figure(figsize=(8, 6))
         plt.imshow(data, cmap=cmap)
         plt.axis('off') # Turn off axes
@@ -25,3 +25,6 @@ class ImagePlotter:
             plt.close()
         else:
             plt.show()
+
+
+
