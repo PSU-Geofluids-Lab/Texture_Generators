@@ -147,8 +147,8 @@ class WaveletSpectrogram:
             vmax = 1
             label = 'Normalized Power'
 
-        ax_ts.plot(self.t, self.intensities, 'b', linewidth=0.5)
-        ax_ts.set_xlim(t[0], t[-1])
+        ax_ts.plot(self.t, self.signal, 'b', linewidth=0.5)
+        ax_ts.set_xlim(self.t[0], self.t[-1])
         ax_ts.set_ylabel('Amplitude')
         ax_ts.set_xlabel('Time [s]')
         ax_ts.set_title('Original Signal')
