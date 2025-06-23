@@ -3,7 +3,25 @@ import matplotlib.pyplot as plt
 import pywt
 import matplotlib.colors as colors
 
-def simple_cwt_spectra_plotting(intensities,lower_freq=0.0001,vmax=.1,vmin=0.01):
+def simple_cwt_spectra_plotting(intensities,lower_freq=0.001,vmax=.1,vmin=0.01,log_power=False):
+    """
+    Plot a Continuous Wavelet Transform (CWT) spectrogram of given intensities.
+
+    Parameters:
+    intensities : array_like
+        1D array of intensity values to be transformed and plotted.
+    lower_freq : float, optional
+        Lower frequency bound for the CWT, default is 0.0001.
+    vmax : float, optional
+        Upper limit for colormap normalization, default is 0.1.
+    vmin : float, optional
+        Lower limit for colormap normalization, default is 0.01.
+    log_power : bool, optional
+        If True, plot data in decibel (dB) scale, default is False.
+
+    This function calculates the CWT of the input intensities using the 'morl'
+    wavelet and plots the resulting spectrogram with a logarithmic frequency axis.
+    """
     Fs = 1 # Assuming a sampling frequency of 1 for a simple time series
     min_scale = pywt.frequency2scale('morl', lower_freq/Fs)
     max_scale = pywt.frequency2scale('morl', 1/Fs) # Example widths, adjust as needed
@@ -16,7 +34,11 @@ def simple_cwt_spectra_plotting(intensities,lower_freq=0.0001,vmax=.1,vmin=0.01)
     [cwtmatr, freqs] = pywt.cwt(intensities, widths, 'morl', sampling_period=1/Fs)
 
     plot_data = np.abs(cwtmatr)**2.
-    plot_data = plot_data/plot_data.max()
+    if log_power:
+        plot_data = 10 * np.log10(plot_data+ 1e-12)  # dB scale
+    else :
+        plot_data = plot_data/plot_data.max()
+
 
     # Plot the spectrogram
     plt.figure(figsize=(12, 6))
@@ -138,7 +160,7 @@ class WaveletSpectrogram:
         # Prepare data for plotting
         if log_power:
             plot_data = 10 * np.log10(self.power + 1e-12)  # dB scale
-            vmax = np.max(plot_data)
+            vmax = np.max(plot_data)/2
             vmin = np.max([np.percentile(plot_data, 5),vmax-15])
             label = 'Power [dB]'
         else:
@@ -150,7 +172,6 @@ class WaveletSpectrogram:
         ax_ts.plot(self.t, self.signal, 'b', linewidth=0.5)
         ax_ts.set_xlim(self.t[0], self.t[-1])
         ax_ts.set_ylabel('Amplitude')
-        ax_ts.set_xlabel('Time [s]')
         ax_ts.set_title('Original Signal')
 
         # Create spectrogram plot
@@ -216,6 +237,26 @@ class WaveletSpectrogram:
 def basic_usage(intensities,t,nv=16,save_to_file=False,filepath=None):
     # Example Usage
     # Create spectrogram with optimal wavelet
+    """
+    Demonstrates the use of the WaveletSpectrogram class to create and plot a spectrogram 
+    using an optimal wavelet for a given intensity time series.
+
+    Parameters:
+    intensities : array_like
+        The intensity values of the signal.
+    t : array_like
+        The time values corresponding to the intensity values.
+    nv : int, optional
+        Number of voices per octave for the wavelet transform (default: 16).
+    save_to_file : bool, optional
+        If True, saves the spectrogram to a file at the specified filepath (default: False).
+    filepath : str, optional
+        Path to save the spectrogram image if save_to_file is True.
+
+    Returns:
+    None
+    """
+
     optimal_wavelet = WaveletSpectrogram.optimal_wavelet(intensities)
     print(f"Optimal wavelet: {optimal_wavelet}")
 
@@ -227,6 +268,6 @@ def basic_usage(intensities,t,nv=16,save_to_file=False,filepath=None):
         fig.savefig(filepath+'/Hilbert_Time_Series_Spectrogram.png', dpi=300, bbox_inches='tight')
         fig.close()
     else:
-        fig.show()
+        plt.show()
 
 

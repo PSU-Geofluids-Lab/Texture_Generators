@@ -4,6 +4,42 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
 def make_hilbert_curve(im1, num_bits=6,num_dims=2,plot_all=True,plot_reconstructed=True,plot_hilbert=True,plot_hilbert_reconstructed=False,save_to_file=False,filepath=None):
+    """
+    Function to generate a hilbert curve of an image, and plot various related figures.
+
+    Parameters
+    ----------
+    im1 : 2D numpy array
+        The image to be processed
+    num_bits : int, optional
+        The number of bits to use for the hilbert curve. Default is 6
+    num_dims : int, optional
+        The number of dimensions to use for the hilbert curve. Default is 2
+    plot_all : bool, optional
+        Whether to plot all of the figures. Default is True
+    plot_reconstructed : bool, optional
+        Whether to plot the reconstructed image. Default is True
+    plot_hilbert : bool, optional
+        Whether to plot the hilbert curve. Default is True
+    plot_hilbert_reconstructed : bool, optional
+        Whether to plot the reconstructed hilbert curve. Default is False
+    save_to_file : bool, optional
+        Whether to save the figures to file. Default is False
+    filepath : str, optional
+        The filepath to save the figures to. Default is None
+
+    Returns
+    -------
+    H : 1D numpy array
+        The hilbert indices of the image
+    intensities : 1D numpy array
+        The intensities of the image
+
+    Notes
+    -----
+    This function will generate a hilbert curve of the image, and plot various related figures.
+    The figures that are plotted will depend on the options chosen.
+    """
     max_h = 2**(num_dims*num_bits)
     hilberts = np.arange(max_h)
     locs = decode(hilberts, num_dims, num_bits)
@@ -18,7 +54,7 @@ def make_hilbert_curve(im1, num_bits=6,num_dims=2,plot_all=True,plot_reconstruct
     if plot_all:
         print('Plotting Hilbert Curve with Hilbert Time Series')
         plt.figure(figsize=(12,4))
-        plt.plot(intensities)
+        plt.plot(H,intensities)
         plt.xlabel('Hilbert Index')
         plt.ylabel('Image Intensity')
         plt.title('Intensity vs Hilbert Index for Hilbert Curve \n (Hilbert Time series)')
