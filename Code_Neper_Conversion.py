@@ -1,6 +1,9 @@
 import numpy as np
 from sklearn.mixture import GaussianMixture
-import cv2
+try :
+    import cv2
+except :
+    print('Please install opencv for full functionality')
 import matplotlib.pyplot as plt
 from matplotlib import ticker
 import os
@@ -341,12 +344,20 @@ class ImageConverter:
         self.grayscale_levels = grayscale_levels
         print('Done the analysis')
 
+    def run_setup_filter(self,img_orig,max_components=10):
+        gmm_optimal = self.gmm_optimal_func(img_orig,comp=max_components)
+        img_adaptive_gray,grayscale_levels = self.generate_binned_grayscale(img_orig,gmm_optimal,optimal_n_components=max_components)
+        self.img_cropped_gray = img_orig
+        self.img_adaptive_gray   = img_adaptive_gray
+        self.grayscale_levels = grayscale_levels
+        print('Done the analysis')
 
-# Example ..
-test_case = ImageConverter('results_T1',filename='img1')
-# Load the image
-img_orig = cv2.imread('img1.png')
-test_case.run_base_case(img_orig)
+
+# # Example ..
+# test_case = ImageConverter('results_T1',filename='img1')
+# # Load the image
+# img_orig = cv2.imread('img1.png')
+# test_case.run_base_case(img_orig)
 
 
 

@@ -6,6 +6,7 @@ import vtk
 from abc import ABC, abstractmethod
 from stl import mesh
 from Plotting import ImagePlotter
+import metrics_images as mtr
 
 class BaseGenerator(ABC):
     """Abstract base class for 2D image generators"""
@@ -103,10 +104,58 @@ class BaseGenerator(ABC):
         texture_mesh.save(filename)
 
     def save_all(self):
+      
       self.to_csv()
       self.to_png()
       self.to_hdf5()
       self.to_vtk()  # VTK Image Data format
       self.to_stl()
       print('All Files saved')
-      
+
+    def make_save_metrics(self,angles_all = np.arange(0,180,5),bins=25,plot_fig=False):
+        """
+        Compute and save various texture metrics for the generated image.
+
+        Parameters
+        ----------
+        angles_all : array_like, optional
+            An array of angles in degrees for rotating the image to compute angular metrics. Default is np.arange(0, 180, 5).
+        bins : int, optional
+            Number of bins to use for histograms and distributions. Default is 25.
+        plot_fig : bool, optional
+            If True, plots will be generated for the computed metrics. Default is False.
+
+        Notes
+        -----
+        This function computes the following metrics for the texture data:
+        - Fractal dimension
+        - Distance transform
+        - Chord length distribution
+        - Lineal path distribution
+        - Angular chord length distribution
+        - Two-point correlation function
+        - Radial distribution
+
+        The results, including plots if requested, are saved to the instance's results directory.
+        """
+        ## First binarize the image, if not done so before
+        if np.unique(self.data).shape[0] > 2:
+            self.binary_data = self.data.copy()
+            threshold = np.percentile(self.binary_data, 50)
+            self.binary_data[self.binary_data > threshold] = 1
+            self.binary_data[self.binary_data <= threshold] = 0
+            self.fractal_data = mtr.make_plot_fractal(self.binary_data,filepath=self.full_path)
+            self.dt = mtr.make_dist_transform(self.binary_data,filepath=self.full_path)
+            self.chrd_x,self.sz_x,self.data_x = mtr.make_chords(self.binary_data,filepath=self.full_path)
+            self.paths,self.lpf = mtr.make_lineal_path_distribution(self.binary_data,filepath=self.full_path)
+            self.data_x_L,self.angles_all,self.all_pdfs = mtr.make_chord_angle_distr(self.binary_data,angles_all,filepath=self.full_path,bins=bins,plot_fig=plot_fig)
+        else :
+            self.fractal_data = mtr.make_plot_fractal(self.data,filepath=self.full_path)
+            self.dt = mtr.make_dist_transform(self.data,filepath=self.full_path)
+            self.chrd_x,self.sz_x,self.data_x = mtr.make_chords(self.data,filepath=self.full_path)
+            self.paths,self.lpf = mtr.make_lineal_path_distribution(self.data,filepath=self.full_path)
+            self.data_x_L,self.angles_all,self.all_pdfs = mtr.make_chord_angle_distr(self.data,angles_all,filepath=self.full_path,bins=bins,plot_fig=plot_fig)
+
+        self.two_pt_corr = mtr.two_pt_corr(self.data,filepath=self.full_path)
+        self.radial_dist = mtr.make_radial_dist(self.dt,filepath=self.full_path)
+        print('Done the metrics : fractal, distance transform (radial dist), 2pt correlation, lineal path distribution, chord length distribution, and angular chord distribution')

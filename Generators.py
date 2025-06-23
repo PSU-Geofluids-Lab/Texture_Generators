@@ -104,6 +104,23 @@ class PoresPyGenerator(BaseGenerator):
         self.full_path = results_folder
 
     def generate(self, seed=None,porosity=None,**kwargs):
+        """
+        Generate a 2D image using the chosen PoresPy generator.
+
+        Parameters
+        ----------
+        seed : int, optional
+            Random seed for the generated image. If None, a random seed is generated.
+        porosity : float, optional
+            Porosity of the generated image. If None, the porosity is not used.
+        kwargs : dict
+            Additional keyword arguments to pass to the chosen PoresPy generator.
+
+        Returns
+        -------
+        data : ndarray
+            The generated image
+        """
         if seed is None:
             # Generate a random seed if none is provided
             seed = np.random.randint(0, 2**32 - 1)
