@@ -3,6 +3,113 @@ import numpy as np
 from Base_Generators import BaseGenerator
 import porespy as ps
 import matplotlib.pyplot as plt
+import mpl_toolkits.axes_grid1 as axgrid
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+import matplotlib.pyplot as plt
+from matplotlib.pyplot import figure
+import networkx as nx
+import seaborn as sns
+
+import structify_net.zoo as zoo
+
+def Make_rank_matrix(rank_model,nodeOrder=None,ax=None,make_plot=False,**kwargs):
+    """
+    Plot a matrix of the graph, ordered by nodePair_order
+    graph: a networkx graph
+    nodePair_order: a list of node pairs, from the most likely to the less likely
+    nodeOrder: a list of nodes, ordered by the order in which they should appear in the matrix
+    """
+    nodePair_order=rank_model.sortedPairs
+    if nodeOrder!=None:
+        n=len(nodeOrder)
+    else:
+        n=len(set([n for e in nodePair_order for n in e]))
+
+
+    matrix = np.zeros((n,n))
+    for i,e in enumerate(nodePair_order):
+        e_l=list(e)
+        matrix[e_l[0],e_l[1]]=i
+        matrix[e_l[1],e_l[0]]=i
+
+    if nodeOrder!=None:
+        matrix=matrix[nodeOrder,:]
+        matrix=matrix[:,nodeOrder]
+
+    if make_plot:
+        heatmap_args={'cmap':"YlGnBu_r",'cbar':False,'xticklabels':False,'yticklabels':False}
+        for k,v in kwargs.items():
+            heatmap_args[k]=v
+        m = sns.heatmap(matrix,ax=ax,**heatmap_args)
+        plt.show()
+    return matrix
+
+class Graph_Generators(BaseGenerator):
+    def __init__(self,size=128,p=0.1,epsilon=0.1):
+        # Initialize BaseGenerator with the provided name
+        """
+        Set of graph adjacency matrix generators as proxies for spatial pattern - using Structify-Net
+        Parameters
+        ----------
+        name : str, optional
+            A name for the generator instance. This is used to create a
+            directory name within "Results" to store generated files.
+            Defaults to 'test1'.
+        """
+        self.name = "Graph_Generators/"
+        self.data = None
+        self.p=p
+        self.epsilon = epsilon
+        self.size = size
+        self.metadata = {
+            'probability': p,
+            'epsilon': epsilon,
+            'size' : size,
+            'generator_type': self.name,  # Use the provided name here
+            'generator_reference': 'Structify-Net - https://structify-net.readthedocs.io/en/latest/index.html',  # Use the provided name here
+        }
+        results_folder = os.path.join("Results", self.name) # Use the provided name here
+        self.full_path = results_folder
+
+        self.all_mods = zoo.get_all_rank_models(n=size,m=(size*p)**2.)
+        self.name_models = self.all_mods.keys()
+
+        # Print the list of files
+        print('Number of Models : '+str(len(self.name_models)))
+        print('\t'.join(self.name_models))
+
+
+    def generate(self, file_name):
+        self.name = self.name+'/'+file_name+f'/p{self.p}_ep{self.epsilon}/'
+        self.model_name = file_name
+        self.full_path  = self.full_path+file_name 
+        os.makedirs(self.full_path, exist_ok=True)
+        # Set the full path for the generator instance's saved files
+        # This assumes the name is used as the directory name within "Results"
+        rank_model = self.all_mods[file_name]
+        matrix = Make_rank_matrix(rank_model,nodeOrder = rank_model.node_order)
+        self.data_prob = matrix/np.max(matrix)
+        self.make_plots(self.data_prob,filename_save=f'Prob_Density_plot_p{self.p}_ep{self.epsilon}.png')
+        gpx = rank_model.generate_graph(epsilon=self.epsilon,density=self.p)
+        self.data = nx.to_numpy_array(gpx)
+        self.data  = self.data/np.max(self.data)
+        self.make_plots(self.data,filename_save=f'Realization_plot_p{self.p}_ep{self.epsilon}.png')
+        # Print the image shape and data type
+        self.add_metadata('model_name', file_name)
+        return self.data
+
+
+    def make_plots(self,matrix,filename_save='Prob_Density_plot.png'):
+        plt.figure(figsize=(10,10))
+        plt.imshow(matrix,cmap='RdYlBu_r')
+        plt.title(f'Model Name : {self.model_name}')
+        plt.gca().set_xlabel("x-axis", fontsize=35)
+        plt.gca().set_ylabel("y-axis", fontsize=35)
+        plt.colorbar()
+        plt.savefig(self.full_path +filename_save)
+        plt.close()
+
 
 class RandomGenerator(BaseGenerator):
     def __init__(self, name='test1',size=(256, 256)):

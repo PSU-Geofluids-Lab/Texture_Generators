@@ -1,1 +1,0 @@
-- Morphology (https://porespy.org/examples/filters/reference/fftmorphology.html) - then segment and region prop
