@@ -20,7 +20,7 @@ class RandomGenerator(BaseGenerator):
             A tuple of two integers specifying the (width, height) of the
             generated image. Defaults to (256, 256).
         """
-        self.name = "RandomGenerator/"+name
+        self.name = "RandomGenerator/"+name+"/"+str(size[0])+'_'+str(size[1])
         self.size = size
         self.data = None
         self.metadata = {
@@ -58,7 +58,7 @@ class RandomGenerator(BaseGenerator):
         return self.data
 
 class PoresPyGenerator(BaseGenerator):
-    def __init__(self, name='blobs',size=(256, 256)):
+    def __init__(self, name='blobs',name_append='',size=(256, 256)):
         # Initialize BaseGenerator with the provided name
         """
         Initialize the PoresPyGenerator instance.
@@ -89,7 +89,7 @@ class PoresPyGenerator(BaseGenerator):
                          'random_cantor_dust','voronoi_edges']
         if name not in allowed_names:
             raise ValueError(f"Invalid name: {name}. Must be one of: {', '.join(allowed_names)}")
-        self.name = "PoresPyGenerator/"+name
+        self.name = "PoresPyGenerator/"+name+'_'+name_append+'/'+str(size[0])+'_'+str(size[1])
         self.name_method = name
         self.size = size
         self.data = None
@@ -253,3 +253,52 @@ class PoresPyGenerator(BaseGenerator):
                                    random_spheres,overlapping_spheres,polydisperse_spheres,voronoi_edges]")
 
 
+
+class USC_TextureGenerator(BaseGenerator):
+    def __init__(self):
+        # Initialize BaseGenerator with the provided name
+        """
+        Initialize a TextureGenerator instance related to the USC Texture Dataset (both rotated and unrotated images).
+        https://sipi.usc.edu/database/database.php?volume=textures&image=10#top
+        Parameters
+        ----------
+        name : str, optional
+            A name for the generator instance. This is used to create a
+            directory name within "Results" to store generated files.
+            Defaults to 'test1'.
+        """
+        self.name = "USC_TextureGenerator/"
+        self.data = None
+        self.metadata = {
+            'generator_type': self.name,  # Use the provided name here
+            'generator_reference': 'https://sipi.usc.edu/database/',  # Use the provided name here
+        }
+        results_folder = os.path.join("Results", self.name) # Use the provided name here
+        self.full_path = results_folder
+
+        folder_path = 'Texture_Files'
+        file_extension = '.tiff'  # Change to the desired extension
+        # Get a list of files in the folder
+        self.files = [file for file in os.listdir(folder_path) if file.endswith(file_extension)]
+        # Print the list of files
+        print('Number of files : '+str(len(self.files)))
+        print('\t'.join(self.files))
+
+
+    def generate(self, file_name):
+        self.name = self.name+'/'+file_name
+        self.full_path  = self.full_path+file_name 
+        os.makedirs(self.full_path, exist_ok=True)
+        # Set the full path for the generator instance's saved files
+        # This assumes the name is used as the directory name within "Results"
+
+        folder_path = 'Texture_Files/'
+        # Load the .tiff file
+        self.data = plt.imread(folder_path+file_name)
+        self.data  = self.data/np.max(self.data)
+        # Print the image shape and data type
+        self.size = self.data.shape
+        self.file_name = file_name
+        self.add_metadata('size', self.size)
+        self.add_metadata('file_name', file_name)
+        return self.data

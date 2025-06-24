@@ -2,10 +2,12 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import porespy as ps
+import openpnm as op
 from tqdm import tqdm
 import numpy as np
 from scipy.interpolate import griddata
 import Code_Neper_Conversion as cn
+from skimage.morphology import binary_dilation
 
 def rotate_image(image, angle,plot_me=False):
     # Get the image dimensions
@@ -73,7 +75,7 @@ def rotate_image(image, angle,plot_me=False):
     rotated_image[rotated_image>image.max()] = image.max()
     if plot_me:
         plt.figure(figsize=(10,10))
-        plt.imshow(rotated_image,interpolation='None')
+        plt.imshow(rotated_image,interpolation='None',origin='lower')
         plt.colorbar()
         plt.show()
     return rotated_image
@@ -172,7 +174,8 @@ def make_plot_fractal(im,filepath=None):
     ax1.plot(data.size, data.count,'-o')
     ax2.plot(data.size, data.slope,'-o')
     if filepath is not None :
-        plt.savefig(f'{filepath}+/Fractal_dimension.png',bbox_inches='tight')
+        plt.savefig(f'{filepath}/Fractal_dimension.png',bbox_inches='tight')
+        plt.close()
     else:
         plt.show()
     return data
@@ -203,7 +206,8 @@ def two_pt_corr(im,filepath=None):
     ax.set_xlabel("distance")
     ax.set_ylabel("two point correlation function")
     if filepath is not None :
-        plt.savefig(f'{filepath}+/2pt_correlation.png',bbox_inches='tight')
+        plt.savefig(f'{filepath}/2pt_correlation.png',bbox_inches='tight')
+        plt.close()
     else:
         plt.show()
     return data
@@ -231,12 +235,12 @@ def make_dist_transform(im,filepath=None):
         raise ValueError('The image must be binary')
     from edt import edt
     dt = edt(im)
-    fig, ax = plt.subplots(1, 1, figsize=[4, 4])
+    fig, ax = plt.subplots(1, 1, figsize=[12, 12])
     msh = ax.imshow(dt, origin='lower', interpolation='none')
-    ax.axis(False)
     plt.colorbar(msh)
     if filepath is not None :
-        plt.savefig(f'{filepath}+/Distance_Transform.png',bbox_inches='tight')
+        plt.savefig(f'{filepath}/Distance_Transform.png',bbox_inches='tight')
+        plt.close()
     else:
         plt.show()
     return dt
@@ -278,7 +282,8 @@ def make_radial_dist(dt,bins=20,log_true=False,filepath=None):
     ax[1].set_xlabel("Distance")
     ax[2].set_xlabel("Distance")
     if filepath is not None :
-        plt.savefig(f'{filepath}+/Distance_Transform_Radial_Density.png',bbox_inches='tight')
+        plt.savefig(f'{filepath}/Distance_Transform_Radial_Density.png',bbox_inches='tight')
+        plt.close()
     else:
         plt.show()
     return data
@@ -340,7 +345,8 @@ def make_chords(texture_data,spacing=3,axis=1,plot_fig=True,bin_spacing=1,filepa
         ax[2].set_title(f'spacing = {spacing}')
         plt.colorbar(mesh,cax=ax[3],label='Region Size')
         if filepath is not None :
-            plt.savefig(f'{filepath}+/Chrord_Image_and_Region_Size_axis_{axis}_spacing_{spacing}.png',bbox_inches='tight')
+            plt.savefig(f'{filepath}/Chrord_Image_and_Region_Size_axis_{axis}_spacing_{spacing}.png',bbox_inches='tight')
+            plt.close()
         else:
             plt.show()
 
@@ -352,14 +358,13 @@ def make_chords(texture_data,spacing=3,axis=1,plot_fig=True,bin_spacing=1,filepa
         ax[1].set_title("Cumulative Density Function")
         ax[2].set_title('Bar Plot')
         if filepath is not None :
-            plt.savefig(f'{filepath}+/Chrord_Image_Stats_axis_{axis}_spacing_{spacing}.png',bbox_inches='tight')
+            plt.savefig(f'{filepath}/Chrord_Image_Stats_axis_{axis}_spacing_{spacing}.png',bbox_inches='tight')
+            plt.close()
         else:
             plt.show()        
     return chrd_x,sz_x,data_x
 
-
-
-def make_chord_angle_distr(texture_data,angles_all,filepath=None,bins=20,plot_fig=False):
+def make_chord_angle_distr(texture_data,angles_all,filepath=None,plot_fig=False,bin_spacing=1,bin_max_fac = 0.5):
     """
     Calculate and plot the angular probability density function (PDF) of chord size distribution
     from given texture data by rotating the image.
@@ -394,9 +399,10 @@ def make_chord_angle_distr(texture_data,angles_all,filepath=None,bins=20,plot_fi
     as both a heatmap and a polar plot.
     """
 
-    _,_,data_x = make_chords(texture_data,plot_fig=False,use_adaptive_bins=False,bins=bins)
-    all_pdfs   = np.zeros([data_x.L.shape[0],angles_all.shape[0]])
-    all_pdfs_freq   = np.zeros([data_x.L.shape[0],angles_all.shape[0]])
+    _,sz_x,data_x = make_chords(texture_data,plot_fig=False,use_adaptive_bins=False,bins=30)
+    bins = np.arange(1, sz_x.max().max()*bin_max_fac, bin_spacing)
+    all_pdfs   = np.zeros([bins.shape[0]-1,angles_all.shape[0]])
+    all_pdfs_freq   = np.zeros([bins.shape[0]-1,angles_all.shape[0]])
 
     for i,angle in tqdm(enumerate(angles_all)) :
         rotated_image = rotate_image(texture_data,angle,plot_me=False)
@@ -412,7 +418,8 @@ def make_chord_angle_distr(texture_data,angles_all,filepath=None,bins=20,plot_fi
     plt.ylabel('Image rotation Angle')
     plt.colorbar(img)
     if filepath is not None :
-        plt.savefig(f'{filepath}+/Chord_Angle_Distribution_Rotation.png',bbox_inches='tight')
+        plt.savefig(f'{filepath}/Chord_Angle_Distribution_Rotation.png',bbox_inches='tight')
+        plt.close()
     else:
         plt.show()        
 
@@ -439,7 +446,8 @@ def make_chord_angle_distr(texture_data,angles_all,filepath=None,bins=20,plot_fi
     plt.tight_layout()
 
     if filepath is not None :
-        plt.savefig(f'{filepath}+/Chord_Angle_Distribution_Rotation_Polar.png',bbox_inches='tight')
+        plt.savefig(f'{filepath}/Chord_Angle_Distribution_Rotation_Polar.png',bbox_inches='tight')
+        plt.close()
     else:
         plt.show()        
 
@@ -480,12 +488,13 @@ def make_lineal_path_distribution(texture_data,filepath=None,axis=0):
     img = plt.imshow(paths*texture_data.astype(int),origin='lower',cmap='Reds');
     plt.colorbar(img,label='Maximum Path Length')
     if filepath is not None :
-        plt.savefig(f'{filepath}+/Lineal_path_distribution_axis_{axis}_Image.png',bbox_inches='tight')
+        plt.savefig(f'{filepath}/Lineal_path_distribution_axis_{axis}_Image.png',bbox_inches='tight')
+        plt.close()
     else:
         plt.show()        
 
 
-    lpf = ps.metrics.lineal_path_distribution(paths, bins=range(1, paths.max(), 1))
+    lpf = ps.metrics.lineal_path_distribution(paths, bins=range(1, int(paths.max()), 1))
     fig, ax = plt.subplots(1, 3, figsize=[10, 4])
     ax[0].plot(lpf.L,lpf.pdf)
     ax[1].plot(lpf.L,lpf.cdf)
@@ -494,63 +503,152 @@ def make_lineal_path_distribution(texture_data,filepath=None,axis=0):
     ax[1].set_title("Cumulative Density Function")
     ax[2].set_title('Bar Plot');
     if filepath is not None :
-        plt.savefig(f'{filepath}+/Lineal_path_distribution_Stats_axis_{axis}.png',bbox_inches='tight')
+        plt.savefig(f'{filepath}/Lineal_path_distribution_Stats_axis_{axis}.png',bbox_inches='tight')
+        plt.close()
     else:
         plt.show()        
     return paths,lpf
 
-def get_regions_segment(im,sigma=0.5,r_max=1,max_phase=5):
+def get_regions_segment(im,sigma=0.5,r_max=1,max_phase=5,filepath=None):
     if np.unique(im).shape[0] > max_phase:
-        cnvrtr = cn.ImageConverter('results_T1',filename='img1')
-        cnvrtr.run_setup_filter(im,max_components=max_phase)
+        cnvrtr = cn.ImageConverter('results_Msc',filename='img1')
+        scale_fact = 255/np.max(im)
+        cnvrtr.run_setup_filter(im*scale_fact,max_components=max_phase)
         im_use = cnvrtr.img_adaptive_gray
         print(f'Converted to {max_phase} phases')
     else :
         im_use = im.copy()
+        del im
+
     snow = ps.filters.snow_partitioning_n(im_use,sigma=sigma,r_max=r_max)
     print(snow)
     # snow = ps.filters.snow_partitioning(im=texture_data)
-    
+    dt_peak = snow.dt.copy()
+    peaks_dilated = binary_dilation(snow.peaks > 0)
+    dt_peak[peaks_dilated == 0] = np.nan
+
+
     fig, ax = plt.subplots(2, 2, figsize=[12, 12])
     img_plA = ax[0,0].imshow(im_use, cmap=plt.cm.copper, origin='lower', interpolation='none');
     plt.colorbar(img_plA,shrink=0.6)
     ax[0,0].set_title('Original Image')
-    img_pl = ax[0,1].imshow(snow.regions, cmap=plt.cm.viridis, origin='lower', interpolation='none');
+    img_pl = ax[0,1].imshow(snow.regions, cmap=plt.cm.RdYlBu_r, origin='lower', interpolation='none');
     plt.colorbar(img_pl,shrink=0.6)
     ax[0,1].set_title('Segmented Regions')
-    img_pl2A =ax[1,0].imshow(snow.dt/im_use/~snow.peaks, origin='lower', interpolation='none')
+    img_pl2A =ax[1,0].imshow(snow.dt/im_use, origin='lower', interpolation='none')
     plt.colorbar(img_pl2A,shrink=0.6)
+    img_pl2 = ax[1,0].imshow(dt_peak, origin='lower', interpolation='none',cmap='RdYlBu_r',vmin=0,vmax=1);
     ax[1,0].axis(False)
-    ax[1,0].set_title('Distance Transform & Peaks')
-    img_pl2 = ax[1,1].imshow(snow.regions/im_use, origin='lower', interpolation='none',cmap='RdYlBu_r');
+    ax[1,0].set_title('Distance Transform')
+
+    img_pl2 = ax[1,1].imshow(dt_peak, origin='lower', interpolation='none',cmap='RdYlBu_r',vmin=0,vmax=1);
     plt.colorbar(img_pl2,shrink=0.6)
     ax[1,1].axis(False)
-    ax[1,1].set_title('Regions Over Original Image')
+    ax[1,1].set_title('Distance Transform Peaks')
     plt.tight_layout()
-    plt.show()
-    return snow
+    if filepath is not None :
+        plt.savefig(f'{filepath}/Image_Segmentation_Snow.png',bbox_inches='tight')
+        plt.close()
+    else:
+        plt.show()        
+    return snow,im_use
 
-# def make_partition_regionprop()
-props = ps.metrics.regionprops_3D(regions)
-r = props[3]
-attrs = [a for a in r.__dir__() if not a.startswith('_')]
-print(attrs)
 
-r = props[1]
-attrs = [a for a in r.__dir__() if not a.startswith('_')]
-print(attrs)
-fig, ax = plt.subplots()
-ax.imshow(r.image);
-ax.imshow(r.border + 0.5*r.inscribed_sphere);
+def get_regions_segment_network(im,sigma=0.5,r_max=10,filepath=None,max_phase=5):
+    if np.unique(im).shape[0] > max_phase:
+        cnvrtr = cn.ImageConverter('results_Msc',filename='img1')
+        scale_fact = 255/np.max(im)
+        cnvrtr.run_setup_filter(im*scale_fact,max_components=max_phase)
+        im_use = cnvrtr.img_adaptive_gray
+        print(f'Converted to {max_phase} phases')
+    else :
+        im_use = im.copy()
+        del im
+        
+    snow = ps.networks.snow2(im_use,sigma=sigma,r_max=r_max)
+    print(snow)
+    pn = op.io.network_from_porespy(snow.network)
+    print(pn)
+    fig, ax = plt.subplots(2, 2, figsize=[12, 12])
+    img_plA = ax[0,0].imshow(im_use, cmap=plt.cm.copper, origin='lower', interpolation='none');
+    plt.colorbar(img_plA,shrink=0.6)
+    ax[0,0].set_title('Original Image')
+    img_pl = ax[0,1].imshow(snow.regions, cmap=plt.cm.RdYlBu_r, origin='lower', interpolation='none');
+    plt.colorbar(img_pl,shrink=0.6)
+    ax[0,1].set_title('Segmented Regions')
+    img_pl2A =ax[1,0].imshow(snow.phases, origin='lower', interpolation='none')
+    plt.colorbar(img_pl2A,shrink=0.6)
+    ax[1,0].set_title('Phases')
+    ax[1,1].imshow(im.T, cmap=plt.cm.bone);
+    op.visualization.plot_coordinates(ax=ax[1,1],
+                                      network=pn,
+                                      size_by=pn["pore.inscribed_diameter"],
+                                      color_by=pn["pore.surface_area"],
+                                      markersize=200)
+    op.visualization.plot_connections(network=pn, ax=ax[1,1])
+    ax[1,1].axis("off");    
+    ax[1,1].set_title('Distance Transform Peaks')
+    plt.tight_layout()
+    if filepath is not None :
+        plt.savefig(f'{filepath}/Image_Segmentation_Snow2_Network.png',bbox_inches='tight')
+        plt.close()
+    else:
+        plt.show()        
+    return snow,im_use
 
-df = ps.metrics.props_to_DataFrame(props)
 
-# # Create an image of maximally inscribed spheres
-# sph = ps.metrics.prop_to_image(regionprops=props, shape=im.shape, prop='inscribed_sphere')
-# fig, ax = plt.subplots()
-# ax.imshow(sph + 0.5*(~im) , cmap=plt.cm.inferno);
 
-# # Create an image colorized by solidity
-# sph = ps.metrics.prop_to_image(regionprops=props, shape=im.shape, prop='solidity')
-# fig, ax = plt.subplots()
-# ax.imshow(sph + 0.5*(~im) , cmap=plt.cm.jet);
+def make_partition_regionprop(im,regions,plot_specific_region=False,region_id=0,summary_images=False,filepath=None):
+    props = ps.metrics.regionprops_3D(regions)
+    r = props[region_id]
+    attrs = [a for a in r.__dir__() if not a.startswith('_')]
+    print('region attributes : ',attrs)
+    if plot_specific_region:
+        r = props[region_id]
+        fig, ax = plt.subplots()
+        imgg = ax.imshow(r.border + 0.5*r.inscribed_sphere);
+        plt.title('Region Border and Inscribed Sphere')
+        ax.imshow(r.image,alpha=0.5);
+        plt.colorbar(imgg,shrink=0.6)
+        if filepath is not None :
+            plt.savefig(f'{filepath}/Image_Segmentation_Snow_Region_Border_Inscribed_Sphere_Region{region_id}.png',bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()        
+        fig, ax = plt.subplots()
+        imgg = ax.imshow(r.image + 1.0*r.convex_image);
+        plt.title('Image and Convex Image')
+        plt.colorbar(imgg)
+        if filepath is not None :
+            plt.savefig(f'{filepath}/Image_Segmentation_Snow_image_Convex_Image_region{region_id}.png',bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()        
+
+    df = ps.metrics.props_to_DataFrame(props)
+    print(df.columns)
+    if summary_images:
+        # Create an image of maximally inscribed spheres
+        sph = ps.metrics.prop_to_image(regionprops=props, shape=im.shape, prop='orientation')*180./np.pi
+        fig, ax = plt.subplots()
+        imgg =ax.imshow(sph/im, cmap=plt.cm.inferno, origin='lower', interpolation='none',);
+        plt.colorbar(imgg)
+        imgg =ax.imshow(0.5*~im, cmap=plt.cm.inferno,alpha=0.1, origin='lower', interpolation='none',);
+        plt.title('Image of orientation')
+        if filepath is not None :
+            plt.savefig(f'{filepath}/Image_Segmentation_Snow_Orientation.png',bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()        
+        # Create an image colorized by solidity
+        sph = ps.metrics.prop_to_image(regionprops=props, shape=im.shape, prop='label')
+        fig, ax = plt.subplots()
+        imgg = ax.imshow(sph/im, cmap=plt.cm.jet, origin='lower', interpolation='none',);
+        plt.colorbar(imgg)
+        plt.title('Image colorized by solidity')
+        if filepath is not None :
+            plt.savefig(f'{filepath}/Image_Segmentation_Snow_Solidity.png',bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()        
+    return df

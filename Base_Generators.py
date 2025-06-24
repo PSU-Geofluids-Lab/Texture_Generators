@@ -31,6 +31,13 @@ class BaseGenerator(ABC):
         """Add custom metadata"""
         self.metadata[key] = value
 
+    def binarize_data(self,percentile_val=50,invert=False):
+        percentile = np.percentile(self.data, percentile_val)
+        if invert:
+            self.data = np.where(self.data > percentile, 1, 0)
+        else : 
+            self.data = np.where(self.data > percentile, 0, 1)
+
     def to_csv(self):
         filename = f"{self.full_path}/Generated_Data.csv"
         with open(filename, 'w', newline='') as f:
@@ -112,50 +119,58 @@ class BaseGenerator(ABC):
       self.to_stl()
       print('All Files saved')
 
-    def make_save_metrics(self,angles_all = np.arange(0,180,5),bins=25,plot_fig=False):
+    def make_save_metrics(self,angles_all = np.arange(0,180,10),bins_chrd=2,plot_fig_chrd=False,r_max=1,sigma=0.5,max_phase=3):
+        ## First binarize the image, if not done so before
         """
-        Compute and save various texture metrics for the generated image.
+        Calculate and save all metrics for the image data.
 
         Parameters
         ----------
         angles_all : array_like, optional
-            An array of angles in degrees for rotating the image to compute angular metrics. Default is np.arange(0, 180, 5).
-        bins : int, optional
-            Number of bins to use for histograms and distributions. Default is 25.
-        plot_fig : bool, optional
-            If True, plots will be generated for the computed metrics. Default is False.
+            An array of angles (in degrees) to rotate the image.
+        bins_chrd : int, optional
+            Number of bins to use for the chord length distribution histogram.
+        plot_fig_chrd : bool, optional
+            If True, plots the chord length distribution for each rotation angle.
+        r_max : float, optional
+            Maximum radial distance for the distance transform.
+        sigma : float, optional
+            Standard deviation of the Gaussian filter used for the distance transform.
+        max_phase : int, optional
+            Maximum number of phases to segment.
 
         Notes
         -----
-        This function computes the following metrics for the texture data:
-        - Fractal dimension
-        - Distance transform
-        - Chord length distribution
-        - Lineal path distribution
-        - Angular chord length distribution
-        - Two-point correlation function
-        - Radial distribution
-
-        The results, including plots if requested, are saved to the instance's results directory.
+        This function first binarizes the image, if not already done so. Then,
+        it calculates all the metrics and saves them in the specified path.
         """
-        ## First binarize the image, if not done so before
         if np.unique(self.data).shape[0] > 2:
             self.binary_data = self.data.copy()
             threshold = np.percentile(self.binary_data, 50)
             self.binary_data[self.binary_data > threshold] = 1
             self.binary_data[self.binary_data <= threshold] = 0
-            self.fractal_data = mtr.make_plot_fractal(self.binary_data,filepath=self.full_path)
-            self.dt = mtr.make_dist_transform(self.binary_data,filepath=self.full_path)
-            self.chrd_x,self.sz_x,self.data_x = mtr.make_chords(self.binary_data,filepath=self.full_path)
-            self.paths,self.lpf = mtr.make_lineal_path_distribution(self.binary_data,filepath=self.full_path)
-            self.data_x_L,self.angles_all,self.all_pdfs = mtr.make_chord_angle_distr(self.binary_data,angles_all,filepath=self.full_path,bins=bins,plot_fig=plot_fig)
+            
+            # self.fractal_data = mtr.make_plot_fractal(self.binary_data,filepath=self.full_path)
+            # self.dt = mtr.make_dist_transform(self.binary_data,filepath=self.full_path)
+            # self.chrd_x,self.sz_x,self.data_x = mtr.make_chords(self.binary_data,filepath=self.full_path)
+            # self.paths,self.lpf = mtr.make_lineal_path_distribution(self.binary_data,filepath=self.full_path)
+            # self.data_x_L,self.angles_all,self.all_pdfs = mtr.make_chord_angle_distr(self.binary_data,angles_all,bin_spacing=bins_chrd,
+            #                                                                          filepath=self.full_path,plot_fig=plot_fig_chrd)
         else :
             self.fractal_data = mtr.make_plot_fractal(self.data,filepath=self.full_path)
             self.dt = mtr.make_dist_transform(self.data,filepath=self.full_path)
             self.chrd_x,self.sz_x,self.data_x = mtr.make_chords(self.data,filepath=self.full_path)
             self.paths,self.lpf = mtr.make_lineal_path_distribution(self.data,filepath=self.full_path)
-            self.data_x_L,self.angles_all,self.all_pdfs = mtr.make_chord_angle_distr(self.data,angles_all,filepath=self.full_path,bins=bins,plot_fig=plot_fig)
+            self.data_x_L,self.angles_all,self.all_pdfs = mtr.make_chord_angle_distr(self.data,angles_all,filepath=self.full_path,
+                                                                                    bin_spacing=bins_chrd,plot_fig=plot_fig_chrd)
 
-        self.two_pt_corr = mtr.two_pt_corr(self.data,filepath=self.full_path)
-        self.radial_dist = mtr.make_radial_dist(self.dt,filepath=self.full_path)
-        print('Done the metrics : fractal, distance transform (radial dist), 2pt correlation, lineal path distribution, chord length distribution, and angular chord distribution')
+        # self.two_pt_corr = mtr.two_pt_corr(self.data,filepath=self.full_path)
+        # self.radial_dist = mtr.make_radial_dist(self.dt,filepath=self.full_path)
+        self.snow_segment,self.data_segmented_im_use = mtr.get_regions_segment(self.data,filepath=self.full_path,sigma=sigma,r_max=r_max,max_phase=max_phase)
+        self.df_prop_summary = mtr.make_partition_regionprop(self.data_segmented_im_use,self.snow_segment.regions,
+                                                        plot_specific_region=False,region_id=10,
+                                                        summary_images=True,filepath=self.full_path)
+        self.snow_network,self.data_im_segmented = mtr.get_regions_segment_network(self.data,sigma=sigma,r_max=r_max,filepath=self.full_path,max_phase=max_phase)
+
+        print('Done the metrics : fractal, distance transform (radial dist), ' \
+                    '2pt correlation, lineal path distribution, chord length distribution, segment& region prop, and angular chord distribution')

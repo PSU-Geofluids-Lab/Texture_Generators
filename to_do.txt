@@ -1,2 +1,10 @@
-- segment + region prop
 - Morphology (https://porespy.org/examples/filters/reference/fftmorphology.html) - then segment and region prop
+
+
+
+
+phase_fracs = ps.metrics.phase_fraction(phases)
+print(phase_fracs)
+
+phase_voxel_num = ps.metrics.phase_fraction(phases, normed=False)
+print(phase_voxel_num)

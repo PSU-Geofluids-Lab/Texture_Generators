@@ -3,7 +3,7 @@ from sklearn.mixture import GaussianMixture
 try :
     import cv2
 except :
-    print('Please install opencv for full functionality')
+    print('Please install opencv for full functionality related to image color to grayscale')
 import matplotlib.pyplot as plt
 from matplotlib import ticker
 import os
@@ -340,7 +340,11 @@ class ImageConverter:
         self.img_cropped = img_cropped
         self.img_cropped_gray = img_cropped_gray
         self.img_black_pixels_gray = img_black_pixels_gray
-        self.img_adaptive_gray   = img_adaptive_gray
+
+        _, labeled_arr = np.unique(img_adaptive_gray, return_inverse=True)
+        labeled_arr = labeled_arr.reshape(img_adaptive_gray.shape)
+        self.img_adaptive_gray_actual   = img_adaptive_gray
+        self.img_adaptive_gray   = labeled_arr
         self.grayscale_levels = grayscale_levels
         print('Done the analysis')
 
@@ -348,7 +352,11 @@ class ImageConverter:
         gmm_optimal = self.gmm_optimal_func(img_orig,comp=max_components)
         img_adaptive_gray,grayscale_levels = self.generate_binned_grayscale(img_orig,gmm_optimal,optimal_n_components=max_components)
         self.img_cropped_gray = img_orig
-        self.img_adaptive_gray   = img_adaptive_gray
+
+        _, labeled_arr = np.unique(img_adaptive_gray, return_inverse=True)
+        labeled_arr = labeled_arr.reshape(img_adaptive_gray.shape)
+        self.img_adaptive_gray_actual   = img_adaptive_gray
+        self.img_adaptive_gray   = labeled_arr
         self.grayscale_levels = grayscale_levels
         print('Done the analysis')
 
