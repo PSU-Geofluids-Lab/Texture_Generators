@@ -509,7 +509,7 @@ def make_lineal_path_distribution(texture_data,filepath=None,axis=0):
         plt.show()        
     return paths,lpf
 
-def get_regions_segment(im,sigma=0.5,r_max=1,max_phase=5,filepath=None):
+def get_regions_segment(im,sigma=0.5,r_max=1,max_phase=5,filepath=None,print_stats=True):
     if np.unique(im).shape[0] > max_phase:
         cnvrtr = cn.ImageConverter('results_Msc',filename='img1')
         scale_fact = 255/np.max(im)
@@ -521,36 +521,37 @@ def get_regions_segment(im,sigma=0.5,r_max=1,max_phase=5,filepath=None):
         del im
 
     snow = ps.filters.snow_partitioning_n(im_use,sigma=sigma,r_max=r_max)
-    print(snow)
+    if print_stats:
+        print(snow)
     # snow = ps.filters.snow_partitioning(im=texture_data)
     dt_peak = snow.dt.copy()
     peaks_dilated = binary_dilation(snow.peaks > 0)
     dt_peak[peaks_dilated == 0] = np.nan
 
+    if print_stats:
+        fig, ax = plt.subplots(2, 2, figsize=[12, 12])
+        img_plA = ax[0,0].imshow(im_use, cmap=plt.cm.copper, origin='lower', interpolation='none');
+        plt.colorbar(img_plA,shrink=0.6)
+        ax[0,0].set_title('Original Image')
+        img_pl = ax[0,1].imshow(snow.regions, cmap=plt.cm.RdYlBu_r, origin='lower', interpolation='none');
+        plt.colorbar(img_pl,shrink=0.6)
+        ax[0,1].set_title('Segmented Regions')
+        img_pl2A =ax[1,0].imshow(snow.dt/im_use, origin='lower', interpolation='none')
+        plt.colorbar(img_pl2A,shrink=0.6)
+        img_pl2 = ax[1,0].imshow(dt_peak, origin='lower', interpolation='none',cmap='RdYlBu_r',vmin=0,vmax=1);
+        ax[1,0].axis(False)
+        ax[1,0].set_title('Distance Transform')
 
-    fig, ax = plt.subplots(2, 2, figsize=[12, 12])
-    img_plA = ax[0,0].imshow(im_use, cmap=plt.cm.copper, origin='lower', interpolation='none');
-    plt.colorbar(img_plA,shrink=0.6)
-    ax[0,0].set_title('Original Image')
-    img_pl = ax[0,1].imshow(snow.regions, cmap=plt.cm.RdYlBu_r, origin='lower', interpolation='none');
-    plt.colorbar(img_pl,shrink=0.6)
-    ax[0,1].set_title('Segmented Regions')
-    img_pl2A =ax[1,0].imshow(snow.dt/im_use, origin='lower', interpolation='none')
-    plt.colorbar(img_pl2A,shrink=0.6)
-    img_pl2 = ax[1,0].imshow(dt_peak, origin='lower', interpolation='none',cmap='RdYlBu_r',vmin=0,vmax=1);
-    ax[1,0].axis(False)
-    ax[1,0].set_title('Distance Transform')
-
-    img_pl2 = ax[1,1].imshow(dt_peak, origin='lower', interpolation='none',cmap='RdYlBu_r',vmin=0,vmax=1);
-    plt.colorbar(img_pl2,shrink=0.6)
-    ax[1,1].axis(False)
-    ax[1,1].set_title('Distance Transform Peaks')
-    plt.tight_layout()
-    if filepath is not None :
-        plt.savefig(f'{filepath}/Image_Segmentation_Snow.png',bbox_inches='tight')
-        plt.close()
-    else:
-        plt.show()        
+        img_pl2 = ax[1,1].imshow(dt_peak, origin='lower', interpolation='none',cmap='RdYlBu_r',vmin=0,vmax=1);
+        plt.colorbar(img_pl2,shrink=0.6)
+        ax[1,1].axis(False)
+        ax[1,1].set_title('Distance Transform Peaks')
+        plt.tight_layout()
+        if filepath is not None :
+            plt.savefig(f'{filepath}/Image_Segmentation_Snow.png',bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()        
     return snow,im_use
 
 
@@ -597,12 +598,12 @@ def get_regions_segment_network(im,sigma=0.5,r_max=10,filepath=None,max_phase=5)
     return snow,im_use
 
 
-
-def make_partition_regionprop(im,regions,plot_specific_region=False,region_id=0,summary_images=False,filepath=None):
+def make_partition_regionprop(im,regions,plot_specific_region=False,region_id=0,summary_images=False,filepath=None,print_Stats=True):
     props = ps.metrics.regionprops_3D(regions)
-    r = props[region_id]
-    attrs = [a for a in r.__dir__() if not a.startswith('_')]
-    print('region attributes : ',attrs)
+    if print_Stats:
+        r = props[region_id]
+        attrs = [a for a in r.__dir__() if not a.startswith('_')]
+        print('region attributes : ',attrs)
     if plot_specific_region:
         r = props[region_id]
         fig, ax = plt.subplots()
@@ -626,7 +627,8 @@ def make_partition_regionprop(im,regions,plot_specific_region=False,region_id=0,
             plt.show()        
 
     df = ps.metrics.props_to_DataFrame(props)
-    print(df.columns)
+    if print_Stats:
+        print(df.columns)
     if summary_images:
         # Create an image of maximally inscribed spheres
         sph = ps.metrics.prop_to_image(regionprops=props, shape=im.shape, prop='orientation')*180./np.pi
@@ -640,15 +642,45 @@ def make_partition_regionprop(im,regions,plot_specific_region=False,region_id=0,
             plt.close()
         else:
             plt.show()        
-        # Create an image colorized by solidity
-        sph = ps.metrics.prop_to_image(regionprops=props, shape=im.shape, prop='label')
-        fig, ax = plt.subplots()
-        imgg = ax.imshow(sph/im, cmap=plt.cm.jet, origin='lower', interpolation='none',);
-        plt.colorbar(imgg)
-        plt.title('Image colorized by solidity')
-        if filepath is not None :
-            plt.savefig(f'{filepath}/Image_Segmentation_Snow_Solidity.png',bbox_inches='tight')
-            plt.close()
-        else:
-            plt.show()        
+        # # Create an image colorized by solidity
+        # sph = ps.metrics.prop_to_image(regionprops=props, shape=im.shape, prop='label')
+        # fig, ax = plt.subplots()
+        # imgg = ax.imshow(sph/im, cmap=plt.cm.jet, origin='lower', interpolation='none',);
+        # plt.colorbar(imgg)
+        # plt.title('Image colorized by solidity')
+        # if filepath is not None :
+        #     plt.savefig(f'{filepath}/Image_Segmentation_Snow_Solidity.png',bbox_inches='tight')
+        #     plt.close()
+        # else:
+        #     plt.show()        
     return df
+
+
+def get_regions_segment_Iterative(texture_data,num_steps = 5,sigma=0.5,r_max=10,mode='erosion'):
+    from scipy import stats
+    from skimage.morphology import disk
+    import pandas as pd
+
+    im = texture_data.copy()
+    for i in range(num_steps):
+        snow,im_use = get_regions_segment(im,sigma=sigma,r_max=r_max,max_phase=2,filepath=None,print_stats=False)
+        if i == 0:
+            df_prop_summary_all = make_partition_regionprop(im_use,snow.regions,
+                                                            plot_specific_region=False,region_id=10,
+                                                            summary_images=True,print_Stats=False)
+            df_prop_summary_all['label'] = i
+        else :
+            df_prop_summary = make_partition_regionprop(im_use,snow.regions,
+                                                            plot_specific_region=False,region_id=10,
+                                                            summary_images=True,print_Stats=False)
+            df_prop_summary['label'] = i
+            df_prop_summary_all = pd.concat([df_prop_summary_all,df_prop_summary])
+        im = ps.filters.fftmorphology(im, strel=disk(1), mode=mode)
+                                            
+    plt.figure(figsize=(8, 6))
+    plt.hist2d(df_prop_summary_all['label'].values,np.log10(df_prop_summary_all['area'].values), bins=[num_steps,10],cmap='RdYlBu_r')
+    plt.xlabel('Evolution Step')
+    plt.ylabel('Area Distribution')
+    plt.colorbar(label='Count')
+    plt.show()
+    return df_prop_summary_all

@@ -252,8 +252,6 @@ class PoresPyGenerator(BaseGenerator):
             raise ValueError(f"Invalid name: {self.name_method}. Must be one of: [blobs,cylindrical_pillars_array,fractal_noise,random_cantor_dust, \\\
                                    random_spheres,overlapping_spheres,polydisperse_spheres,voronoi_edges]")
 
-
-
 class USC_TextureGenerator(BaseGenerator):
     def __init__(self):
         # Initialize BaseGenerator with the provided name
