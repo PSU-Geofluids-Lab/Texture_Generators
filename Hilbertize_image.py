@@ -5,40 +5,33 @@ import matplotlib.colors as mcolors
 
 def make_hilbert_curve(im1, num_bits=6,num_dims=2,plot_all=True,plot_reconstructed=True,plot_hilbert=True,plot_hilbert_reconstructed=False,save_to_file=False,filepath=None):
     """
-    Function to generate a hilbert curve of an image, and plot various related figures.
-
+    Plot the Hilbert curve with Hilbert time series and/or reconstructed image.
     Parameters
     ----------
-    im1 : 2D numpy array
-        The image to be processed
+    im1 : 2D array
+        The image to be transformed.
     num_bits : int, optional
-        The number of bits to use for the hilbert curve. Default is 6
+        The number of bits to use for the Hilbert curve. The default is 6.
     num_dims : int, optional
-        The number of dimensions to use for the hilbert curve. Default is 2
+        The number of dimensions to use for the Hilbert curve. The default is 2.
     plot_all : bool, optional
-        Whether to plot all of the figures. Default is True
+        Whether to plot all the plots. The default is True.
     plot_reconstructed : bool, optional
-        Whether to plot the reconstructed image. Default is True
+        Whether to plot the reconstructed image. The default is True.
     plot_hilbert : bool, optional
-        Whether to plot the hilbert curve. Default is True
+        Whether to plot the Hilbert curve. The default is True.
     plot_hilbert_reconstructed : bool, optional
-        Whether to plot the reconstructed hilbert curve. Default is False
+        Whether to plot the Hilbert curve with the reconstructed image. The default is False.
     save_to_file : bool, optional
-        Whether to save the figures to file. Default is False
+        Whether to save the plots to a file. The default is False.
     filepath : str, optional
-        The filepath to save the figures to. Default is None
-
+        The path to save the plots to. The default is None.
     Returns
     -------
-    H : 1D numpy array
-        The hilbert indices of the image
-    intensities : 1D numpy array
-        The intensities of the image
-
-    Notes
-    -----
-    This function will generate a hilbert curve of the image, and plot various related figures.
-    The figures that are plotted will depend on the options chosen.
+    H : array
+        The Hilbert time series.
+    intensities : array
+        The intensities of the image.
     """
     max_h = 2**(num_dims*num_bits)
     hilberts = np.arange(max_h)
@@ -54,7 +47,7 @@ def make_hilbert_curve(im1, num_bits=6,num_dims=2,plot_all=True,plot_reconstruct
     if plot_all:
         print('Plotting Hilbert Curve with Hilbert Time Series')
         plt.figure(figsize=(12,4))
-        plt.plot(H,intensities)
+        plt.plot(H,intensities,linewidth=0.1)
         plt.xlabel('Hilbert Index')
         plt.ylabel('Image Intensity')
         plt.title('Intensity vs Hilbert Index for Hilbert Curve \n (Hilbert Time series)')

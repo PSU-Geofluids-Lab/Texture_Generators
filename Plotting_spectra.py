@@ -3,7 +3,9 @@ import matplotlib.pyplot as plt
 import pywt
 import matplotlib.colors as colors
 
-def simple_cwt_spectra_plotting(intensities,lower_freq=0.001,vmax=.1,vmin=0.01,log_power=False):
+
+
+def simple_cwt_spectra_plotting(intensities,lower_freq=0.001,vmax=.1,vmin=0.01,log_power=False,Fs = 1):
     """
     Plot a Continuous Wavelet Transform (CWT) spectrogram of given intensities.
 
@@ -18,11 +20,12 @@ def simple_cwt_spectra_plotting(intensities,lower_freq=0.001,vmax=.1,vmin=0.01,l
         Lower limit for colormap normalization, default is 0.01.
     log_power : bool, optional
         If True, plot data in decibel (dB) scale, default is False.
+    Fs : float, optional
+        Sampling frequency, default is 1.
 
     This function calculates the CWT of the input intensities using the 'morl'
     wavelet and plots the resulting spectrogram with a logarithmic frequency axis.
     """
-    Fs = 1 # Assuming a sampling frequency of 1 for a simple time series
     min_scale = pywt.frequency2scale('morl', lower_freq/Fs)
     max_scale = pywt.frequency2scale('morl', 1/Fs) # Example widths, adjust as needed
     # Logarithmic scale spacing

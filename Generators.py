@@ -45,6 +45,32 @@ def Make_rank_matrix(rank_model,nodeOrder=None,ax=None,make_plot=False,**kwargs)
         plt.show()
     return matrix
 
+def generate_adjacency_matrix(graph_type_name, n=10, **kwargs):
+  """
+  Generates an adjacency matrix for a networkx graph of a specified type.
+
+  Args:
+    graph_type_name: The name of the networkx graph generation function (string).
+                     Must be a function available in networkx.
+    n: The number of nodes in the graph (integer).
+    **kwargs: Additional keyword arguments to pass to the networkx graph
+              generation function.
+
+  Returns:
+    A numpy array representing the adjacency matrix of the generated graph.
+    Returns None if the graph type is not found.
+  """
+  try:
+    graph_generator = getattr(nx, graph_type_name)
+    G = graph_generator(n=n, **kwargs)
+    adj_matrix = nx.to_numpy_array(G)
+    if graph_type_name == 'margulis_gabber_galil_graph':
+        print('Actual graph size in margulis_gabber_galil_graph is',G.number_of_nodes())
+    return adj_matrix,G
+  except AttributeError:
+    print(f"Error: Graph type '{graph_type_name}' not found in networkx.")
+    return None
+
 class Graph_Generators(BaseGenerator):
     def __init__(self,size=128,p=0.4,epsilon=0.1):
         """
@@ -503,3 +529,135 @@ class USC_TextureGenerator(BaseGenerator):
         self.add_metadata('size', self.size)
         self.add_metadata('file_name', file_name)
         return self.data
+
+class Graph_NetworkX_Generators(BaseGenerator):
+    def __init__(self,size=128):
+        self.name = "Graph_NetworkX_Generators/"
+        self.data = None
+        self.size = size
+        self.metadata = {
+            'size' : size,
+            'generator_type': self.name,  # Use the provided name here
+            'generator_reference': 'NetworkX',  # Use the provided name here
+        }
+        results_folder = os.path.join("Results", self.name) # Use the provided name here
+        self.full_path = results_folder
+        self.name_models = ['fast_gnp_random_graph','connected_caveman_graph','margulis_gabber_galil_graph', 'newman_watts_strogatz_graph','watts_strogatz_graph','barabasi_albert_graph','gaussian_random_partition_graph']
+        # Print the list of files
+        print('Number of Models : '+str(len(self.name_models)) + '\n Model Names :')
+        print('\t'.join(self.name_models))
+
+    def generate(self, file_name,**kwargs):
+        self.name = self.name+'/'+file_name+'/'
+        self.model_name = file_name
+        self.full_path  = self.full_path+file_name 
+        os.makedirs(self.full_path, exist_ok=True)
+        # Set the full path for the generator instance's saved files
+        # This assumes the name is used as the directory name within "Results"
+        if file_name == 'margulis_gabber_galil_graph':
+            self.size = int(np.sqrt(self.size))
+            self.add_metadata('size', self.size**2.)
+            print('New Size (margulis_gabber_galil_graph): '+str(self.size**2.0))
+            self.data,self.gpx = generate_adjacency_matrix(file_name,n=self.size,**kwargs)
+        elif file_name == 'fast_gnp_random_graph':
+            p = kwargs.get('p', .1) # Probability for edge creation.
+            self.add_metadata('p', p)
+            self.data,self.gpx = generate_adjacency_matrix(file_name,n=self.size,p=p)
+        elif file_name == 'newman_watts_strogatz_graph':
+            k = kwargs.get('k', 10) # Each node is joined with its k nearest neighbors in a ring topology.
+            p = kwargs.get('p', .1) # The probability of adding a new edge for each edge.
+            self.add_metadata('p', p)
+            self.add_metadata('k', k)
+            self.data,self.gpx = generate_adjacency_matrix(file_name,n=self.size,k=k,p=p)
+        elif file_name == 'watts_strogatz_graph':
+            k = kwargs.get('k', 10) # Each node is joined with its k nearest neighbors in a ring topology.
+            p = kwargs.get('p', .1) # The probability of adding a new edge for each edge.
+            self.add_metadata('p', p)
+            self.add_metadata('k', k)
+            self.data,self.gpx = generate_adjacency_matrix(file_name,n=self.size,k=k,p=p)
+        elif file_name == 'barabasi_albert_graph':
+            m = kwargs.get('m', 10) # Number of edges to attach from a new node to existing nodes
+            self.add_metadata('m', m)
+            self.data,self.gpx = generate_adjacency_matrix(file_name,n=self.size,m=m)
+        elif file_name == 'gaussian_random_partition_graph':
+            s = kwargs.get('s', 20) # Mean cluster size
+            v = kwargs.get('v', 2) # Variance of the Gaussian distribution is s/v
+            p_in = kwargs.get('p_in', .4) # Probability of intra cluster connection.
+            p_out = kwargs.get('p_out', .1) # Probability of inter cluster connection.
+            self.add_metadata('s', s)
+            self.add_metadata('v', v)
+            self.add_metadata('p_in', p_in)
+            self.add_metadata('p_out', p_out)
+            self.data,self.gpx = generate_adjacency_matrix(file_name,n=self.size,s=s,v=v,p_in=p_in,p_out=p_out)
+        elif file_name == 'connected_caveman_graph':
+            l = kwargs.get('l', int(self.size/4)) # number of cliques
+            k = kwargs.get('k', 4) # size of cliques (k at least 2 or NetworkXError is raised)
+            self.size = l*k
+            self.add_metadata('size', self.size)
+            self.add_metadata('l', l)
+            self.add_metadata('k', k)
+            self.gpx = nx.connected_caveman_graph(l, k)
+            self.data = nx.to_numpy_array(self.gpx)
+        else :
+            raise ValueError(f"Model {file_name} not found in {self.name_models}")
+        self.data  = self.data/np.max(self.data)
+        # Print the image shape and data type
+        self.porosity =  np.sum(self.data)/(self.data.shape[0]*self.data.shape[1])
+        self.add_metadata('model_name', file_name)
+        self.add_metadata('porosity', self.porosity)
+        print('Metadata : '+str(self.metadata))
+        return self.data
+
+    def make_spatial_realization(self,scaling_ratio=2,linlog=False,plot_me=False,target_porosity=0.1):
+        """
+        Make a spatial realization of the graph, using the ForceAtlas2 and Spring embedding methods.
+        
+        Parameters
+        ----------
+        scaling_ratio : float, optional
+            Determines the scaling of attraction and repulsion forces. Defaults to 2.0.
+        linlog : bool, optional
+            Uses logarithmic attraction instead of linear. Defaults to False.
+        plot_me : bool, optional
+            Plot the two embeddings. Defaults to False.
+        target_porosity : float, optional
+            Target porosity of the generated image. Defaults to 0.1.
+        Notes
+        -----
+        The generated image is saved in a directory named after the generator instance,
+        within the "Results" directory.
+
+        The generator instance is initialized with the following metadata:
+            - 'porosity': porosity
+            - 'generator_type': self.name
+            - 'generator_reference': 'Structify-Net - https://structify-net.readthedocs.io/en/latest/index.html'
+        """
+        self.data = np.zeros([self.size,self.size])
+        self.data_spring = np.zeros([self.size,self.size])
+        self.porosity =  np.sum(self.data)/(self.data.shape[0]*self.data.shape[1])
+        iteration_num = 0
+        while self.porosity < target_porosity:
+            pos_forceatlas2 = nx.forceatlas2_layout(self.gpx,max_iter=1000,scaling_ratio=scaling_ratio,linlog=linlog)
+            pos_spring = nx.spring_layout(self.gpx,iterations=1000,method="energy", scale=1)
+            joint_array = np.vstack(list(pos_forceatlas2.values()))
+            joint_array_forceatlas2 = (nx.rescale_layout(joint_array,scale=self.size/2) + self.size/2-1).astype(int)
+            del joint_array
+            joint_array = np.vstack(list(pos_spring.values()))
+            joint_array_spring = (nx.rescale_layout(joint_array,scale=self.size/2) + self.size/2-1).astype(int)
+            del joint_array
+            self.data_adjacency = self.data.copy()
+            self.data[joint_array_forceatlas2[:,0],joint_array_forceatlas2[:,1]] = 1
+            self.data_spring[joint_array_spring[:,0], joint_array_spring[:,1]] = 1
+            self.porosity =  np.sum(self.data)/(self.data.shape[0]*self.data.shape[1])
+            print(f'Iteration - porosity target : {self.porosity}, Iteration {iteration_num}')
+            iteration_num+=1
+        if plot_me:
+            plt.figure(figsize=(10,10))
+            plt.plot(joint_array_forceatlas2[:,0],joint_array_forceatlas2[:,1],'o',label='ForceAtlas2')
+            plt.plot(joint_array_spring[:,0],joint_array_spring[:,1],'o',label='Spring')
+            plt.title('Physical Space representation of the generated graph')
+            plt.legend()
+            plt.show()
+        self.add_metadata('porosity', self.porosity)
+        print('Done with the graph Spatial representation generation')
+

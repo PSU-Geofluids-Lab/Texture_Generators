@@ -1,6 +1,12 @@
 !pip install vtk
+!pip install opencv
 !pip install porespy
 !pip install numpy-stl
 !pip install pypardiso
 !pip install PyWavelets
 !pip install numpy-hilbert-curve
+!pip install ts2vg
+!pip install antropy
+!pip install antropy
+!pip install tsfel
+
