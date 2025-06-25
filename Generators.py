@@ -46,16 +46,33 @@ def Make_rank_matrix(rank_model,nodeOrder=None,ax=None,make_plot=False,**kwargs)
     return matrix
 
 class Graph_Generators(BaseGenerator):
-    def __init__(self,size=128,p=0.1,epsilon=0.1):
-        # Initialize BaseGenerator with the provided name
+    def __init__(self,size=128,p=0.4,epsilon=0.1):
         """
-        Set of graph adjacency matrix generators as proxies for spatial pattern - using Structify-Net
+        Initialize a Graph_Generators instance.
+
         Parameters
         ----------
-        name : str, optional
-            A name for the generator instance. This is used to create a
-            directory name within "Results" to store generated files.
-            Defaults to 'test1'.
+        size : int, optional
+            The size of the generated texture. Defaults to 128.
+        p : float, optional
+            The probability of having a connection between two nodes. Defaults to 0.4.
+        epsilon : float, optional
+            The maximum distance between two points to consider them connected. Defaults to 0.1.
+
+        Notes
+        -----
+        The generated texture is a graph, where each node is a pixel in the image.
+        The edges in the graph are the connections between pixels, which are determined
+        by the probability `p` and the maximum distance `epsilon`.
+        The generated texture is saved in a directory named after the generator instance,
+        within the "Results" directory.
+
+        The generator instance is initialized with the following metadata:
+            - 'probability': p
+            - 'epsilon': epsilon
+            - 'size' : size
+            - 'generator_type': self.name
+            - 'generator_reference': 'Structify-Net - https://structify-net.readthedocs.io/en/latest/index.html'
         """
         self.name = "Graph_Generators/"
         self.data = None
@@ -65,40 +82,103 @@ class Graph_Generators(BaseGenerator):
         self.metadata = {
             'probability': p,
             'epsilon': epsilon,
+            'm' : (size*p)**2.,
             'size' : size,
             'generator_type': self.name,  # Use the provided name here
             'generator_reference': 'Structify-Net - https://structify-net.readthedocs.io/en/latest/index.html',  # Use the provided name here
         }
         results_folder = os.path.join("Results", self.name) # Use the provided name here
         self.full_path = results_folder
-
-        self.all_mods = zoo.get_all_rank_models(n=size,m=(size*p)**2.)
-        self.name_models = self.all_mods.keys()
-
+        self.m = (size*p)**2.
+        self.name_models = ["ER","spatial","spatialWS","blocks_assortative","overlapping_communities", "nestedness","maximal_stars","core_distance","fractal_leaves", "fractal_root","fractal_hierarchy","fractal_star","perlin_noise","disconnected_cliques"]
         # Print the list of files
-        print('Number of Models : '+str(len(self.name_models)))
+        print('Number of Models : '+str(len(self.name_models)) + '\n Model Names :')
         print('\t'.join(self.name_models))
 
-
-    def generate(self, file_name):
+    def generate(self, file_name,**kwargs):
         self.name = self.name+'/'+file_name+f'/p{self.p}_ep{self.epsilon}/'
         self.model_name = file_name
         self.full_path  = self.full_path+file_name 
         os.makedirs(self.full_path, exist_ok=True)
         # Set the full path for the generator instance's saved files
         # This assumes the name is used as the directory name within "Results"
-        rank_model = self.all_mods[file_name]
+        k = kwargs.get('dimensions', 10) #Number of nearest neighbors. Defaults to 10.
+        blocks = kwargs.get('blocks', None) # Blocks or communities. Can be either a list of lists, where each list is a block, or an integer, in which case the nodes are randomly assigned to the corresponding number of equal size blocks. Defaults to None.
+        dimensions = kwargs.get('dimensions', 1) # Number of dimensions to embed the graph in. Defaults to 1.
+        d = kwargs.get('d', 3) # Degree of the binary tree. Defaults to 3.
+        octaves = kwargs.get('octaves', 6) # Number of octaves to use in the fractal noise generation (Perlin). Defaults to 6.
+        if file_name != 'disconnected_cliques':
+            rank_model = zoo.all_models_no_param[file_name](self.size,**kwargs)
+        else : 
+            rank_model = zoo.all_models_with_m[file_name](self.size,self.m)
         matrix = Make_rank_matrix(rank_model,nodeOrder = rank_model.node_order)
         self.data_prob = matrix/np.max(matrix)
         self.make_plots(self.data_prob,filename_save=f'Prob_Density_plot_p{self.p}_ep{self.epsilon}.png')
-        gpx = rank_model.generate_graph(epsilon=self.epsilon,density=self.p)
-        self.data = nx.to_numpy_array(gpx)
+        self.gpx = rank_model.generate_graph(epsilon=self.epsilon,density=self.p)
+        self.data = nx.to_numpy_array(self.gpx)
         self.data  = self.data/np.max(self.data)
         self.make_plots(self.data,filename_save=f'Realization_plot_p{self.p}_ep{self.epsilon}.png')
         # Print the image shape and data type
         self.add_metadata('model_name', file_name)
+        self.add_metadata('k', k)
+        self.add_metadata('blocks', blocks)
+        self.add_metadata('dimensions', dimensions)
+        self.add_metadata('octaves', octaves)
+        self.add_metadata('d', d)
         return self.data
 
+    def make_spatial_realization(self,scaling_ratio=10,linlog=False,plot_me=False,target_porosity=0.1):
+        """
+        Make a spatial realization of the graph, using the ForceAtlas2 and Spring embedding methods.
+        
+        Parameters
+        ----------
+        scaling_ratio : float, optional
+            Determines the scaling of attraction and repulsion forces. Defaults to 2.0.
+        linlog : bool, optional
+            Uses logarithmic attraction instead of linear. Defaults to False.
+        plot_me : bool, optional
+            Plot the two embeddings. Defaults to False.
+        target_porosity : float, optional
+            Target porosity of the generated image. Defaults to 0.1.
+        Notes
+        -----
+        The generated image is saved in a directory named after the generator instance,
+        within the "Results" directory.
+
+        The generator instance is initialized with the following metadata:
+            - 'porosity': porosity
+            - 'generator_type': self.name
+            - 'generator_reference': 'Structify-Net - https://structify-net.readthedocs.io/en/latest/index.html'
+        """
+        self.data = np.zeros([self.size,self.size])
+        self.data_spring = np.zeros([self.size,self.size])
+        self.porosity =  np.sum(self.data)/(self.data.shape[0]*self.data.shape[1])
+        iteration_num = 0
+        while self.porosity < target_porosity:
+            pos_forceatlas2 = nx.forceatlas2_layout(self.gpx,max_iter=1000,scaling_ratio=scaling_ratio,linlog=linlog)
+            pos_spring = nx.spring_layout(self.gpx,iterations=1000,method="energy", scale=1)
+            joint_array = np.vstack(list(pos_forceatlas2.values()))
+            joint_array_forceatlas2 = (nx.rescale_layout(joint_array,scale=self.size/2) + self.size/2-1).astype(int)
+            del joint_array
+            joint_array = np.vstack(list(pos_spring.values()))
+            joint_array_spring = (nx.rescale_layout(joint_array,scale=self.size/2) + self.size/2-1).astype(int)
+            del joint_array
+            self.data_adjacency = self.data.copy()
+            self.data[joint_array_forceatlas2[:,0],joint_array_forceatlas2[:,1]] = 1
+            self.data_spring[joint_array_spring[:,0], joint_array_spring[:,1]] = 1
+            self.porosity =  np.sum(self.data)/(self.data.shape[0]*self.data.shape[1])
+            print(f'Iteration - porosity target : {self.porosity}, Iteration {iteration_num}')
+            iteration_num+=1
+        if plot_me:
+            plt.figure(figsize=(10,10))
+            plt.plot(joint_array_forceatlas2[:,0],joint_array_forceatlas2[:,1],'o',label='ForceAtlas2')
+            plt.plot(joint_array_spring[:,0],joint_array_spring[:,1],'o',label='Spring')
+            plt.title('Physical Space representation of the generated graph')
+            plt.legend()
+            plt.show()
+        self.add_metadata('porosity', self.porosity)
+        print('Done with the graph Spatial representation generation')
 
     def make_plots(self,matrix,filename_save='Prob_Density_plot.png'):
         plt.figure(figsize=(10,10))
@@ -107,9 +187,8 @@ class Graph_Generators(BaseGenerator):
         plt.gca().set_xlabel("x-axis", fontsize=35)
         plt.gca().set_ylabel("y-axis", fontsize=35)
         plt.colorbar()
-        plt.savefig(self.full_path +filename_save)
+        plt.savefig(self.full_path + '/'+filename_save)
         plt.close()
-
 
 class RandomGenerator(BaseGenerator):
     def __init__(self, name='test1',size=(256, 256)):
@@ -166,30 +245,27 @@ class RandomGenerator(BaseGenerator):
 
 class PoresPyGenerator(BaseGenerator):
     def __init__(self, name='blobs',name_append='',size=(256, 256)):
-        # Initialize BaseGenerator with the provided name
         """
-        Initialize the PoresPyGenerator instance.
+        Initialize a PoresPyGenerator instance.
 
         Parameters
         ----------
         name : str, optional
-            The name of the generator instance, used to create a directory for results.
-            Default is 'test1'.
+            The name of the generator function to use. Must be one of:
+            'blobs', 'cylindrical_pillars_array', 'fractal_noise',
+            'random_spheres', 'overlapping_spheres', 'polydisperse_spheres',
+            'random_cantor_dust', 'voronoi_edges'
+        name_append : str, optional
+            An optional string to append to the name of the generator.
         size : tuple of int, optional
-            The size of the generated 2D image as (width, height). Default is (256, 256).
+            The size of the generated image.
 
-        Attributes
-        ----------
-        name : str
-            The name of the generator prefixed with 'PoresPyGenerator/'.
-        size : tuple of int
-            The dimensions of the 2D image to be generated.
-        data : NoneType
-            Placeholder for the generated image data.
-        metadata : dict
-            Metadata containing 'generator_type' and 'size'.
-        full_path : str
-            The full path to the directory where results are saved.
+        Notes
+        -----
+        This class is a wrapper around the PoresPy generators. It provides a
+        standardized interface for generating 2D images and saving them to
+        disk. The generated image is stored in the `data` attribute, and the
+        metadata is stored in the `metadata` attribute.
         """
         allowed_names = ['blobs', 'cylindrical_pillars_array',
                          'fractal_noise','random_spheres','overlapping_spheres','polydisperse_spheres',
@@ -203,7 +279,7 @@ class PoresPyGenerator(BaseGenerator):
         self.metadata = {
             'generator_type': self.name,  # Use the provided name here
             'size': size
-        }
+                }
         results_folder = os.path.join("Results", self.name) # Use the provided name here
         os.makedirs(results_folder, exist_ok=True)
         # Set the full path for the generator instance's saved files
@@ -212,152 +288,153 @@ class PoresPyGenerator(BaseGenerator):
 
     def generate(self, seed=None,porosity=None,**kwargs):
         """
-        Generate a 2D image using the chosen PoresPy generator.
+        Generate a 2D image using the provided PoresPy generator.
 
         Parameters
         ----------
         seed : int, optional
             Random seed for the generated image. If None, a random seed is generated.
         porosity : float, optional
-            Porosity of the generated image. If None, the porosity is not used.
-        kwargs : dict
-            Additional keyword arguments to pass to the chosen PoresPy generator.
+            Porosity target for the generated image. If None, the porosity is not set.
+        **kwargs
+            Additional keyword arguments to pass to the PoresPy generator.
 
         Returns
         -------
         data : ndarray
-            The generated image
+            The generated image.
         """
         if seed is None:
             # Generate a random seed if none is provided
             seed = np.random.randint(0, 2**32 - 1)
         print(f"Using seed: {seed}")
         if self.name_method == 'blobs':
-            # Generate a 2D image using the Blobs generator from PoresPy.
-            # This function uses the blobs function works by generating an image of random noise then applying a Gaussian blur. 
-            # The creates a correleated field with a Gaussian distribution. The function will then normalize the values back to a uniform distribution, 
-            # which allow direct thresholding of the image to obtain a binary images (i.e. solid and void).
-            # It’s possible to create directional correlation by specifying the blobiness argument as an array with a different value in each direction '''
-            blobiness = kwargs.pop('blobiness', [1,1])
+            """
+            Generate a 2D image using the Blobs generator from PoresPy.
+
+            This function generates an image of random noise and applies a Gaussian blur
+            to create a correlated field with a Gaussian distribution. The values are then 
+            normalized back to a uniform distribution, allowing direct thresholding to obtain 
+            binary images (i.e., solid and void). Directional correlation can be created by 
+            specifying the blobiness argument as an array with different values in each direction.
+            """
+            blobiness = kwargs.pop('blobiness', [1, 1])
             if porosity is not None:
-                self.data_unthreshold = ps.generators.blobs(shape=self.size, seed=seed, porosity=None, blobiness=blobiness,**kwargs)
-            self.data = ps.generators.blobs(shape=self.size, seed=seed, porosity=porosity, blobiness=blobiness,**kwargs)
+                self.data_unthreshold = ps.generators.blobs(
+                    shape=self.size, seed=seed, porosity=None, blobiness=blobiness, **kwargs)
+            self.data = ps.generators.blobs(
+                shape=self.size, seed=seed, porosity=porosity, blobiness=blobiness, **kwargs)
             self.add_metadata('seed', seed)
             self.add_metadata('porosity', porosity)
             self.add_metadata('blobiness', blobiness)
-            print(f'Done! - Use the {self.name_method} function with the following parameters: "shape": {str(self.size)}')
+            print(f'Done! - Used the {self.name_method} function with the following parameters: "shape": {str(self.size)}')
+            print(f'metadata: {self.metadata}')
             return self.data
+
         elif self.name_method == 'cylindrical_pillars_array':
-            # Generate an image of cylindrical pillars using the cylindrical_pillars_array function from PoreSpy.
-            # >>> texture_data =generator.generate(spacing=3,dist='norm', dist_kwargs=dict(loc=1, scale=1))
-            # >>> texture_data =generator.generate(spacing=3,dist='uniform', dist_kwargs=dict(loc=1, scale=1),lattice='simple',)
+            """
+            Generate an image of cylindrical pillars using the cylindrical_pillars_array function from PoreSpy.
+
+            Parameters such as spacing, distribution, and lattice type can be provided to customize
+            the generated array of pillars.
+            """
             spacing = kwargs.pop('spacing', 10)
             dist = kwargs.pop('dist', 'norm')
             dist_kwargs = kwargs.pop('dist_kwargs', dict(loc=2, scale=4))
             lattice = kwargs.pop('lattice', 'triangular')
-            self.data = ps.generators.cylindrical_pillars_array(shape=self.size, seed=seed, spacing=spacing,lattice=lattice,
-                                                    dist=dist, dist_kwargs=dist_kwargs,**kwargs)
-            porosity = np.sum(self.data)/(self.data.shape[0]*self.data.shape[1])
-            print('Porosity: '+str(porosity))
+            self.data = ps.generators.cylindrical_pillars_array(
+                shape=self.size, seed=seed, spacing=spacing, lattice=lattice,
+                dist=dist, dist_kwargs=dist_kwargs, **kwargs)
+            porosity = np.sum(self.data) / (self.data.shape[0] * self.data.shape[1])
+            print('Porosity: ' + str(porosity))
             self.add_metadata('seed', seed)
             self.add_metadata('porosity', porosity)
             self.add_metadata('lattice', lattice)
             self.add_metadata('spacing', spacing)
             self.add_metadata('dist', dist)
-            self.add_metadata('dist_kwargs', dict(loc=1, scale=1))
-            print(f'Done! - Use the {self.name_method} function with the following parameters: "shape": {str(self.size)}')
+            self.add_metadata('dist_kwargs', dist_kwargs)
+            print(f'Done! - Used the {self.name_method} function with the following parameters: "shape": {str(self.size)}')
+            print(f'metadata: {self.metadata}')
             return self.data
+
         elif self.name_method == 'fractal_noise':
+            """
+            Generate a 2D image using the Fractal Noise generator from PoreSpy.
+
+            The frequency parameter controls the size of the blobs relative to the image size,
+            while octaves control the levels of noise overlaid to create texture. Gain controls
+            the intensity of each noise layer, and mode specifies the noise type (perlin, simplex, etc.).
+            """
             frequency = kwargs.pop('frequency', 0.1)
             octaves = kwargs.pop('octaves', 6)
             gain = kwargs.pop('gain', 0.5)
             mode = kwargs.pop('mode', 'simplex')
-            self.data_unthreshold = ps.generators.fractal_noise(shape=self.size,seed=seed,frequency=frequency,uniform=False,
-                                                                    octaves=octaves,gain=gain,mode=mode,**kwargs)       
-            self.data = ps.generators.fractal_noise(shape=self.size,seed=seed,frequency=frequency,uniform=True,
-                                                                    octaves=octaves,gain=gain,mode=mode,**kwargs)   
-            porosity = np.sum(self.data)/(self.data.shape[0]*self.data.shape[1])
-            print('Porosity: '+str(porosity))
+            self.data_unthreshold = ps.generators.fractal_noise(
+                shape=self.size, seed=seed, frequency=frequency, uniform=False,
+                octaves=octaves, gain=gain, mode=mode, **kwargs)
+            self.data = ps.generators.fractal_noise(
+                shape=self.size, seed=seed, frequency=frequency, uniform=True,
+                octaves=octaves, gain=gain, mode=mode, **kwargs)
+            porosity = np.sum(self.data) / (self.data.shape[0] * self.data.shape[1])
+            print('Porosity: ' + str(porosity))
             self.add_metadata('seed', seed)
             self.add_metadata('porosity', porosity)
             self.add_metadata('octaves', octaves)
             self.add_metadata('mode', mode)
             self.add_metadata('gain', gain)
             self.add_metadata('frequency', frequency)
-            print(f'Done! - Use the {self.name_method} function with the following parameters: "shape": {str(self.size)}')
+            print(f'Done! - Used the {self.name_method} function with the following parameters: "shape": {str(self.size)}')
+            print(f'metadata: {self.metadata}')
             return self.data
+
         elif self.name_method == 'random_cantor_dust':
+            """
+            Generate a 2D image using the Random Cantor Dust generator from PoreSpy.
+
+            The n parameter controls iterations of the Cantor dust algorithm, f controls the 
+            proportion of area removed in each iteration, and p controls the probability of 
+            removing a square in each iteration.
+            """
             n = kwargs.pop('n', 8)
             f = kwargs.pop('f', 1)
             p = kwargs.pop('p', 3)
-            self.data = ps.generators.random_cantor_dust(shape=self.size,seed=seed,n=n,**kwargs) 
-            porosity = np.sum(self.data)/(self.data.shape[0]*self.data.shape[1])
-            print('Porosity: '+str(porosity))
+            self.data = ps.generators.random_cantor_dust(
+                shape=self.size, seed=seed, n=n, **kwargs)
+            porosity = np.sum(self.data) / (self.data.shape[0] * self.data.shape[1])
+            print('Porosity: ' + str(porosity))
             self.add_metadata('seed', seed)
             self.add_metadata('porosity', porosity)
             self.add_metadata('f', f)
             self.add_metadata('n', n)
             self.add_metadata('p', p)
-            print(f'Done! - Use the {self.name_method} function with the following parameters: "shape": {str(self.size)}')
+            print(f'Done! - Used the {self.name_method} function with the following parameters: "shape": {str(self.size)}')
+            print(f'metadata: {self.metadata}')
             return self.data
+
         elif self.name_method == 'polydisperse_spheres':
-            import scipy.stats as spst
-            if porosity is None:
-                porosity = 0.5
+            """
+            Generate a 2D image using the Polydisperse Spheres generator from PoreSpy.
+
+            The dist parameter controls the distribution of the sphere radii, nbins controls 
+            the number of bins for discretizing the radius distribution, and r_min controls 
+            the minimum radius of the spheres.
+            """
             dist = kwargs.pop('dist', spst.norm(loc=10, scale=5))
             nbins = kwargs.pop('nbins', 10)
             r_min = kwargs.pop('r_min', 5)
-            self.data = ps.generators.polydisperse_spheres(seed=seed,shape=self.size, porosity=porosity, dist=dist, nbins=nbins,r_min=r_min,**kwargs)
+            self.data = ps.generators.polydisperse_spheres(
+                seed=seed, shape=self.size, porosity=porosity, dist=dist, nbins=nbins, r_min=r_min, **kwargs)
             self.add_metadata('seed', seed)
             self.add_metadata('porosity', porosity)
             self.add_metadata('dist', dist)
             self.add_metadata('nbins', nbins)
             self.add_metadata('r_min', r_min)
-            print(f'Done! - Use the {self.name_method} function with the following parameters: "shape": {str(self.size)}')
+            print(f'Done! - Used the {self.name_method} function with the following parameters: "shape": {str(self.size)}')
+            print(f'metadata: {self.metadata}')
             return self.data
-        elif self.name_method == 'random_spheres':
-            import scipy.stats as spst
-            r = kwargs.pop('r', 5)
-            clearance = kwargs.pop('clearance', 0.1)
-            protrusion = kwargs.pop('protrusion', 3)
-            self.data = ps.generators.random_spheres(seed=seed,im_or_shape=self.size, r=r,edges='contained',clearance=clearance,protrusion=protrusion,
-                                                    *kwargs)
-            porosity = np.sum(self.data)/(self.data.shape[0]*self.data.shape[1])
-            print('Porosity: '+str(porosity))
-            self.add_metadata('seed', seed)
-            self.add_metadata('porosity', porosity)
-            self.add_metadata('edges', 'contained')
-            self.add_metadata('clearance', clearance)
-            self.add_metadata('protrusion', protrusion)
-            self.add_metadata('r', r)
-            print(f'Done! - Use the {self.name_method} function with the following parameters: "shape": {str(self.size)}')
-            return self.data
-        elif self.name_method == 'overlapping_spheres':
-            t = 1e-2
-            mi=100
-            r = kwargs.pop('r', 5)
-            if porosity is None:
-                porosity = 0.5
-            self.data = ps.generators.overlapping_spheres(seed=seed,shape=self.size, r=r,porosity=porosity,maxiter=mi, tol=t, *kwargs)
-            self.add_metadata('seed', seed)
-            self.add_metadata('porosity', porosity)
-            self.add_metadata('tolerance',t)
-            self.add_metadata('maxiert', mi)
-            self.add_metadata('r', r)
-            print(f'Done! - Use the {self.name_method} function with the following parameters: "shape": {str(self.size)}')
-            return self.data
-        elif self.name_method == 'voronoi_edges':
-            ncells = kwargs.pop('ncells', 50)
-            r = kwargs.pop('r', 1)
-            self.data = ps.generators.voronoi_edges(seed=seed,shape=self.size, ncells=ncells,flat_faces=False,r=r, *kwargs)
-            self.add_metadata('seed', seed)
-            self.add_metadata('ncells', ncells)
-            self.add_metadata('r', r)
-            print(f'Done! - Use the {self.name_method} function with the following parameters: "shape": {str(self.size)}')
-            return self.data
+
         else:
-            raise ValueError(f"Invalid name: {self.name_method}. Must be one of: [blobs,cylindrical_pillars_array,fractal_noise,random_cantor_dust, \\\
-                                   random_spheres,overlapping_spheres,polydisperse_spheres,voronoi_edges]")
+            raise ValueError(f"Invalid name: {self.name_method}. Must be one of: [blobs, cylindrical_pillars_array, fractal_noise, random_cantor_dust, random_spheres, overlapping_spheres, polydisperse_spheres, voronoi_edges]")
 
 class USC_TextureGenerator(BaseGenerator):
     def __init__(self):
@@ -391,6 +468,25 @@ class USC_TextureGenerator(BaseGenerator):
 
 
     def generate(self, file_name):
+        """
+        Generate and load a 2D texture image from a specified file.
+
+        Parameters
+        ----------
+        file_name : str
+            The name of the .tiff file to be loaded from the 'Texture_Files/' directory.
+
+        Returns
+        -------
+        data : ndarray
+            The loaded image data, normalized by its maximum value.
+
+        Notes
+        -----
+        The function updates the instance's name and full_path attributes to include the file name.
+        It creates a directory for saving generated files if it does not already exist.
+        The image shape and file name are added to the metadata.
+        """
         self.name = self.name+'/'+file_name
         self.full_path  = self.full_path+file_name 
         os.makedirs(self.full_path, exist_ok=True)

@@ -1,0 +1,114 @@
+
+    #string to directory to save data into
+    save_dir = os.getcwd() + '/output/'
+    os.makedirs(save_dir, exist_ok=True)
+    ### With prob ..
+    #create measure_obj
+    projected_3PCF = sarabande.measure(nPCF=3, projected=True, m_max=11,
+                                      density_field_data = G_grid_array,
+                                      save_dir=save_dir, save_name='example',
+                                      nbins=40, physical_boxsize=n, rmin=1e-14, rmax=int(n/2),
+                                      normalize=True)
+
+    sarabande.calc_zeta(projected_3PCF, verbose_flag=True)
+
+    m_values = np.array([0,1,2,3,4,5,6,7,8,9,10,11])
+    fig, axs = plt.subplots(3,4, figsize=(20,12))
+
+    for m,ax1 in zip(m_values,axs.flatten()):
+      img = projected_3PCF.zeta[m, :,:]
+
+      # Real Part (left)
+      im1 = ax1.imshow(img.real, origin='lower', cmap='bwr',vmin= -np.max(np.abs(img.real)),vmax= np.max(np.abs(img.real)))
+      ax1.set_title(f"Real Part: m = {m}-mode", pad = 10)
+      divider1 = axgrid.make_axes_locatable(ax1)
+      cax1 = divider1.append_axes("right", size='5%', pad=0.05)
+      plt.colorbar(im1, cax=cax1)
+      # # Imaginary Part (right)
+      # im2 = ax2.imshow(img.imag, origin='lower', cmap='bwr',vmin= -np.max(np.abs(img.imag)),vmax= np.max(np.abs(img.imag)))
+      # ax2.set_title("Imaginary Part", pad = 10)
+      # ax2.set_xlabel("$\mathrm{b}_1$", fontsize=30)
+      # ax2.set_ylabel("$\mathrm{b}_2$", fontsize=30)
+      # divider2 = axgrid.make_axes_locatable(ax2)
+      # cax2 = divider2.append_axes("right", size='5%', pad=0.05)
+      # plt.colorbar(im2, cax=cax2)
+
+      # fig.suptitle("Projected 3PCF: $\\hat{\\zeta}^{\; \\mathrm{b}_1 \\mathrm{b}_2}_m$", fontsize=35)
+    #fig.tight_layout()
+    ax1.set_xlabel("$\mathrm{b}_1$", fontsize=30)
+    ax1.set_ylabel("$\mathrm{b}_2$", fontsize=30)
+    plt.savefig(f'/content/drive/MyDrive/Texture_PCF/{name}_p{p}_ep{epsilon}/3PCF_Realization-{name}_p{p}_ep{epsilon}.png')
+    plt.close()
+
+    #string to directory to save data into
+    save_dir = os.getcwd() + '/output/'
+    os.makedirs(save_dir, exist_ok=True)
+    ### With prob ..
+    #create measure_obj
+    projected_3PCF = sarabande.measure(nPCF=3, projected=True, m_max=11,
+                                      density_field_data = matrix,
+                                      save_dir=save_dir, save_name='example',
+                                      nbins=40, physical_boxsize=n, rmin=1e-14, rmax=int(n/2),
+                                      normalize=True)
+
+    sarabande.calc_zeta(projected_3PCF, verbose_flag=True)
+
+    m_values = np.array([0,1,2,3,4,5,6,7,8,9,10,11])
+    fig, axs = plt.subplots(3,4, figsize=(20,12))
+
+    for m,ax1 in zip(m_values,axs.flatten()):
+      img = projected_3PCF.zeta[m, :,:]
+
+      # Real Part (left)
+      im1 = ax1.imshow(img.real, origin='lower', cmap='bwr',vmin= -np.max(np.abs(img.real)),vmax= np.max(np.abs(img.real)))
+      ax1.set_title(f"Real Part: m = {m}-mode", pad = 10)
+      divider1 = axgrid.make_axes_locatable(ax1)
+      cax1 = divider1.append_axes("right", size='5%', pad=0.05)
+      plt.colorbar(im1, cax=cax1)
+      # # Imaginary Part (right)
+      # im2 = ax2.imshow(img.imag, origin='lower', cmap='bwr',vmin= -np.max(np.abs(img.imag)),vmax= np.max(np.abs(img.imag)))
+      # ax2.set_title("Imaginary Part", pad = 10)
+      # ax2.set_xlabel("$\mathrm{b}_1$", fontsize=30)
+      # ax2.set_ylabel("$\mathrm{b}_2$", fontsize=30)
+      # divider2 = axgrid.make_axes_locatable(ax2)
+      # cax2 = divider2.append_axes("right", size='5%', pad=0.05)
+      # plt.colorbar(im2, cax=cax2)
+
+      # fig.suptitle("Projected 3PCF: $\\hat{\\zeta}^{\; \\mathrm{b}_1 \\mathrm{b}_2}_m$", fontsize=35)
+    #fig.tight_layout()
+    ax1.set_xlabel("$\mathrm{b}_1$", fontsize=30)
+    ax1.set_ylabel("$\mathrm{b}_2$", fontsize=30)
+    plt.savefig(f'/content/drive/MyDrive/Texture_PCF/{name}_p{p}_ep{epsilon}/3PCF_Probability-{name}_p{p}_ep{epsilon}.png')
+    plt.close()
+
+    data_inp = (matrix*8).astype(int)
+    print(data_inp.max())
+    from skimage.feature import graycomatrix, graycoprops
+    distances=[2,6,12]
+    angles=[0,60,120,180,240,300]
+
+    glcm = graycomatrix(
+            data_inp, distances=distances,angles=angles, levels=9, symmetric=True, normed=True
+        )
+
+    dist_grid, ang_grid = np.meshgrid(distances,angles)
+
+    dist_grid = dist_grid.flatten()
+    ang_grid = ang_grid.flatten()
+
+    fig, axs = plt.subplots(3,6, figsize=(20,12))
+    for i,(ang_v,dist_v,ax1) in enumerate(zip(ang_grid,dist_grid,axs.flatten())):
+        indx_ang = np.where(angles==ang_v)[0]
+        indx_dist = np.where(distances==dist_v)[0]
+        img = glcm[:,:,indx_dist,indx_ang]
+        # Real Part (left)
+        im1 = ax1.imshow(img, origin='lower', cmap='bwr',vmin= np.min(np.abs(img.real)),vmax= np.max(np.abs(img.real)))
+        ax1.set_title(f"GLCM : {ang_v}-{dist_v}", pad = 10)
+        divider1 = axgrid.make_axes_locatable(ax1)
+        cax1 = divider1.append_axes("right", size='5%', pad=0.05)
+        plt.colorbar(im1, cax=cax1)
+
+    # ax1.set_xlabel("$\mathrm{b}_1$", fontsize=30)
+    # ax1.set_ylabel("$\mathrm{b}_2$", fontsize=30)
+    plt.savefig(f'/content/drive/MyDrive/Texture_PCF/{name}_p{p}_ep{epsilon}/GCLM_Prob-{name}_p{p}_ep{epsilon}.png')
+    plt.close()
