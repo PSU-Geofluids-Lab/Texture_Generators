@@ -3,7 +3,7 @@ from hilbert import decode, encode
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
-def make_hilbert_curve(im1, num_bits=6,num_dims=2,plot_all=True,plot_reconstructed=True,plot_hilbert=True,plot_hilbert_reconstructed=False,save_to_file=False,filepath=None):
+def make_hilbert_curve(im1, save_locs=False,num_bits=6,num_dims=2,plot_all=True,plot_reconstructed=True,plot_hilbert=True,plot_hilbert_reconstructed=False,save_to_file=False,filepath=None):
     """
     Plot the Hilbert curve with Hilbert time series and/or reconstructed image.
     Parameters
@@ -102,5 +102,7 @@ def make_hilbert_curve(im1, num_bits=6,num_dims=2,plot_all=True,plot_reconstruct
             plt.close()
         else:
             plt.show()
-
-    return H, intensities
+    if save_locs:
+        return H, intensities,locs
+    else :
+        return H, intensities
