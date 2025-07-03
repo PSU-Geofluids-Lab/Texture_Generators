@@ -15,6 +15,7 @@ import structify_net.zoo as zoo
 
 import gstools as gst
 from gstools import transform as tf
+import h5py
 
 def Make_rank_matrix(rank_model,nodeOrder=None,ax=None,make_plot=False,**kwargs):
     """
@@ -857,6 +858,7 @@ class Variogram_PGGenerator(BaseGenerator):
     def __init__(self, name='test1',size=256):
         """
         Initialize a Variogram_PGGenerator instance.
+        https://geostat-framework.readthedocs.io/projects/gstools/en/stable/examples/11_plurigaussian/01_pgs.html
 
         Parameters
         ----------
@@ -1202,3 +1204,75 @@ class Variogram_PGGenerator(BaseGenerator):
             axs[1, 1].imshow(self.data, cmap="copper", origin="lower")
             plt.show()            
         return self.data
+
+
+class Micro2D_Generator(BaseGenerator):
+    def __init__(self):
+        # Initialize BaseGenerator with the provided name
+        """
+        Initialize a TextureGenerator instance related to the Micro2D data
+        Parameters
+        ----------
+        name : str, optional
+            A name for the generator instance. This is used to create a
+            directory name within "Results" to store generated files.
+            Defaults to 'test1'.
+        """
+        self.name = "Micro2D_Generator/"
+        self.data = None
+        self.metadata = {
+            'generator_type': self.name,  # Use the provided name here
+            'generator_reference': '# https://arobertson38.github.io/MICRO2D/',  # Use the provided name here
+        }
+        results_folder = os.path.join("Results", self.name) # Use the provided name here
+        self.full_path = results_folder
+        self.base_file_path = 'Texture_Files_Micro2D/MICRO2D_homogenized.h5'
+        # Print the list of files
+        with h5py.File(self.base_file_path, 'r') as f:
+                print("Keys in the HDF5 file:", list(f.keys()))
+        self.allowed_names = ('AngEllipse', 'GRF', 'NBSA', 'RandomEllipse', 'VoidSmall', 'VoidSmallBig', 'VoronoiLarge', 'VoronoiMedium', 'VoronoiMediumSpaced', 'VoronoiSmall')
+        self.find_num_files()
+
+    def find_num_files(self):
+        file_count = {}
+        f=h5py.File(self.base_file_path, 'r')
+        for file_name in self.allowed_names:
+            dataset = f[file_name]
+            print(f'Number of Images {file_name} : {dataset[file_name].shape[0]}')
+            file_count[file_name] = dataset[file_name].shape[0]
+
+    def generate(self, file_name,count=0):
+        """
+        Generate and load a 2D texture image from a specified file.
+
+        Parameters
+        ----------
+        file_name : str
+            The name of the .tiff file to be loaded from the 'Texture_Files/' directory.
+
+        Returns
+        -------
+        data : ndarray
+            The loaded image data, normalized by its maximum value.
+
+        """
+        if file_name not in self.allowed_names:
+            raise Exception(f"Invalid name: {file_name}, mistake? Choose from {self.allowed_names}")
+        f=h5py.File(self.base_file_path, 'r')
+        dataset = f[file_name]
+        print(f'Number of Images : {dataset[file_name].shape[0]}')
+        self.name = self.name+'/'+file_name
+        self.full_path  = self.full_path+file_name 
+        os.makedirs(self.full_path, exist_ok=True)
+        self.data = dataset[file_name][count]
+
+        # Print the image shape and data type
+        self.size = self.data.shape
+        self.file_name = file_name
+        self.porosity = np.sum(self.data)/self.data.size
+        self.add_metadata('porosity',self.porosity)
+        self.add_metadata('size', self.size)
+        self.add_metadata('file_name', file_name)
+        self.add_metadata('Image_Count', count)
+        return self.data
+

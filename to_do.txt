@@ -1,3 +1,20 @@
+-- Add the 3 pt correlation function metrics,
+-- Adding a few things from PyRadiomics re GLMN etc -- 
+-- Adding the texture generators for rock mineral type .. Neper etc
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     #string to directory to save data into
     save_dir = os.getcwd() + '/output/'

@@ -11,19 +11,26 @@ https://www.sciencedirect.com/science/article/pii/S2352711020303083
 
 
 Other generators : 
-https://porespy.org/
 https://github.com/materialsinnovation/pymks
+https://github.com/materialsinnovation/pymks/blob/master/pymks/datasets/base_microstructure_generator.py
+https://github.com/materialsinnovation/pymks/blob/master/pymks/datasets/microstructure_generator.py
+
+
+
 https://docs.microstructpy.org/en/latest/
+https://docs.microstructpy.org/en/latest/examples/package/grain_neighborhoods.html
+
+
+
 https://link.springer.com/article/10.1007/s40192-023-00340-4
 https://arobertson38.github.io/MICRO2D/
 
 https://arxiv.org/pdf/2412.05168
 
-Represetnation -- 
-
-https://caam37830.github.io/book/05_graphs/spectral.html
 
 Methods -- 
 https://pysal.org/spaghetti/
 
 
+Others : 
+https://github.com/materialsinnovation/pymks/blob/master/pymks/datasets/cahn_hilliard_simulation.py
