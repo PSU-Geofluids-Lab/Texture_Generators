@@ -1232,6 +1232,7 @@ class Micro2D_Generator(BaseGenerator):
                 print("Keys in the HDF5 file:", list(f.keys()))
         self.allowed_names = ('AngEllipse', 'GRF', 'NBSA', 'RandomEllipse', 'VoidSmall', 'VoidSmallBig', 'VoronoiLarge', 'VoronoiMedium', 'VoronoiMediumSpaced', 'VoronoiSmall')
         self.find_num_files()
+        print('Look at the Dataset_Dropbox.txt file for the full dataset link to download into Texture_Files_Micro2D folder')
 
     def find_num_files(self):
         file_count = {}
