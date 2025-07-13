@@ -7,6 +7,8 @@ from abc import ABC, abstractmethod
 from stl import mesh
 from Plotting import ImagePlotter
 import metrics_images as mtr
+import matplotlib.pyplot as plt
+import dill
 
 class BaseGenerator(ABC):
     """Abstract base class for 2D image generators"""
@@ -38,28 +40,116 @@ class BaseGenerator(ABC):
         else : 
             self.data = np.where(self.data > percentile, 0, 1)
 
-    def to_csv(self):
-        filename = f"{self.full_path}/Generated_Data.csv"
+    def to_csv(self,extra_tag=''):
+        filename = f"{self.full_path}/Generated_Data{extra_tag}.csv"
         with open(filename, 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(['# ' + f"{k}: {v}" for k, v in self.metadata.items()])
             np.savetxt(f, self.data, delimiter=',')
 
-    def to_png(self):
-        filename = f"{self.full_path}/Generated_Data.png"
+    def to_png(self,extra_tag=''):
+        filename = f"{self.full_path}/Generated_Data{extra_tag}.png"
         ImagePlotter.plot(self.data, save_path=filename)
-        filename = f"{self.full_path}/Generated_Data_NoFrills.png"
+        filename = f"{self.full_path}/Generated_Data{extra_tag}_NoFrills.png"
         ImagePlotter.plot_Nofrills(self.data, save_path=filename)
 
-    def to_hdf5(self):
-        filename = f"{self.full_path}/Generated_Data.h5"
+    def to_hdf5(self,extra_tag=''):
+        filename = f"{self.full_path}/Generated_Data{extra_tag}.h5"
         with h5py.File(filename, 'w') as f:
             dset = f.create_dataset('texture', data=self.data)
             for k, v in self.metadata.items():
                 dset.attrs[k] = v
 
-    def to_vtk(self):
-        filename = f"{self.full_path}/Generated_Data.vti"
+    def binarize_data_basic(self,data,percentile_val=50,invert=False):
+        percentile = np.percentile(data, percentile_val)
+        if invert:
+            data = np.where(data > percentile, 1, 0)
+        else : 
+            data = np.where(data > percentile, 0, 1)
+        return data
+    
+    def colorize_data(self,data,distribution='random', num_colors=10,**kwargs):
+        data_color = np.zeros_like(data)
+        # Sample values from the specified distribution
+        if distribution == 'random':
+            colors = np.random.randint(1, num_colors, size=np.sum(data == 1))
+        elif distribution == 'normal':
+            mean_val = kwargs.get('mean_val', num_colors/2)
+            sigma_val = kwargs.get('sigma_val', num_colors/4)
+            colors = np.random.normal(mean_val, sigma_val, size=np.sum(data == 1))
+            colors = np.clip(colors, 1, num_colors)
+        elif distribution == 'poisson':
+            lam = kwargs.get('lam', num_colors/2)
+            colors = np.random.poisson(lam=lam,  size=np.sum(data == 1))
+            colors = np.clip(colors, 1, num_colors)
+        elif distribution == 'lognormal':
+            mean_val = kwargs.get('mean_val', num_colors/2)
+            sigma_val = kwargs.get('sigma_val', num_colors/16)
+            colors = np.random.lognormal(mean_val, sigma_val,  size=np.sum(data == 1))
+            colors = num_colors*colors/colors.max()/.5
+            colors = np.clip(colors, 1, num_colors)
+        elif distribution == 'powerlaw':
+            slope = kwargs.get('slope', 2)
+            colors = np.random.power(slope,  size=np.sum(data == 1))*(num_colors-1)+1
+            colors = np.clip(colors, 1, num_colors)
+        elif distribution == 'exponential':
+            scale = kwargs.get('scale', num_colors/4)
+            colors = np.random.exponential(scale=scale,  size=np.sum(data == 1))+1
+            colors = np.clip(colors, 1, num_colors)
+        elif distribution == 'binomial':
+            colors = np.random.binomial(n=num_colors, p=0.5, size=np.sum(data == 1))
+            colors = np.clip(colors, 1, num_colors)
+        else:
+            raise ValueError("Invalid distribution. Must be 'random', 'normal', 'lognormal', 'powerlaw', 'exponential', 'poisson', or 'binomial'.")
+        # # Assign colors to pixels
+        data_color[data == 1] = colors
+        return data_color
+
+    def colorize(self,distribution='random', num_colors=10,**kwargs):
+        self.data_color = np.zeros_like(self.data)
+        # Sample values from the specified distribution
+        if distribution == 'random':
+            colors = np.random.randint(1, num_colors, size=np.sum(self.data == 1))
+        elif distribution == 'normal':
+            mean_val = kwargs.get('mean_val', num_colors/2)
+            sigma_val = kwargs.get('sigma_val', num_colors/4)
+            colors = np.random.normal(mean_val, sigma_val, size=np.sum(self.data == 1))
+            colors = np.clip(colors, 1, num_colors)
+        elif distribution == 'poisson':
+            lam = kwargs.get('lam', num_colors/2)
+            colors = np.random.poisson(lam=lam,  size=np.sum(self.data == 1))
+            colors = np.clip(colors, 1, num_colors)
+        elif distribution == 'lognormal':
+            mean_val = kwargs.get('mean_val', num_colors/2)
+            sigma_val = kwargs.get('sigma_val', num_colors/16)
+            colors = np.random.lognormal(mean_val, sigma_val,  size=np.sum(self.data == 1))
+            colors = num_colors*colors/colors.max()/.5
+            colors = np.clip(colors, 1, num_colors)
+        elif distribution == 'powerlaw':
+            slope = kwargs.get('slope', 2)
+            colors = np.random.power(slope,  size=np.sum(self.data == 1))*(num_colors-1)+1
+            colors = np.clip(colors, 1, num_colors)
+        elif distribution == 'exponential':
+            scale = kwargs.get('scale', num_colors/4)
+            colors = np.random.exponential(scale=scale,  size=np.sum(self.data == 1))+1
+            colors = np.clip(colors, 1, num_colors)
+        elif distribution == 'binomial':
+            colors = np.random.binomial(n=num_colors, p=0.5, size=np.sum(self.data == 1))
+            colors = np.clip(colors, 1, num_colors)
+        else:
+            raise ValueError("Invalid distribution. Must be 'random', 'normal', 'lognormal', 'powerlaw', 'exponential', 'poisson', or 'binomial'.")
+
+        # # Assign colors to pixels
+        self.data_color[self.data == 1] = colors
+        self.distribution_color = distribution
+
+        ## Convert to uint8
+        self.data_color = self.data_color.astype(np.uint8)
+        self.add_metadata('distribution_color',self.distribution_color)
+        self.add_metadata('number_of_colors',num_colors)
+
+    def to_vtk(selfextra_tag=''):
+        filename = f"{self.full_path}/Generated_Data{extra_tag}.vti"
         # Create structured grid
         grid = vtk.vtkImageData()
         grid.SetDimensions(self.data.shape[1], self.data.shape[0], 1)
@@ -82,8 +172,8 @@ class BaseGenerator(ABC):
         writer.SetInputData(grid)
         writer.Write()
 
-    def to_stl(self,scale=10):
-        filename = f"{self.full_path}/Generated_Data.stl"
+    def to_stl(self,scale=10,extra_tag=''):
+        filename = f"{self.full_path}/Generated_Data{extra_tag}.stl"
         # Create surface mesh from 2D data
         height, width = self.data.shape
         vertices = []
@@ -110,14 +200,87 @@ class BaseGenerator(ABC):
 
         texture_mesh.save(filename)
 
-    def save_all(self):
+    def save_all(self,extra_tag=''):
       
-      self.to_csv()
-      self.to_png()
-      self.to_hdf5()
-      self.to_vtk()  # VTK Image Data format
-      self.to_stl()
+      self.to_csv(extra_tag=extra_tag)
+      self.to_png(extra_tag=extra_tag)
+      self.to_hdf5(extra_tag=extra_tag)
+      self.to_vtk(extra_tag=extra_tag)  # VTK Image Data format
+      self.to_stl(extra_tag=extra_tag)
       print('All Files saved')
+
+    def fit_region_prop(self,connectivity=2):
+        if np.unique(self.data).size != 2:
+            raise ValueError("Data must be binary!! - use binarize_data function or something else first")
+
+        import skimage.measure as measure
+        import matplotlib.patches as patches
+        # Assume texture_data is a 2D numpy array
+        # Label the connected regions in the texture data
+        self.labeled_image = measure.label(self.data,connectivity=connectivity)
+        # Find the region properties
+        self.regions = measure.regionprops(self.labeled_image)
+
+        # # Print the properties of each region
+        # for region in regions:
+        #     print(f"Region {region.label}:")
+        #     print(f"  Area: {region.area}")
+        #     print(f"  Perimeter: {region.perimeter}")
+        #     print(f"  Eccentricity: {region.eccentricity}")
+        #     print(f"  Solidity: {region.solidity}")
+        #     print(f"  Orientation: {region.orientation}")
+        #     print(f"  Bounding box: {region.bbox}")
+
+        # Plot the texture data
+        fig, ax = plt.subplots(figsize=(20,20))
+        ax.imshow(self.data, cmap='gray')
+
+        for i, region in enumerate(self.regions):
+            minr, minc, maxr, maxc = region.bbox
+            rect = patches.Rectangle((minc, minr), maxc-minc, maxr-minr, edgecolor='red', linewidth=2, fill=False)
+            ax.add_patch(rect)
+            ax.text(5+minc + (maxc - minc) / 2, minr + (maxr - minr) / 2, str(i), ha='center', va='center', color='red')
+
+        plt.title(f'Texture Data with Region Properties; Total regions : {len(self.regions)}')
+        plt.show()
+
+        fig, ax = plt.subplots(figsize=(20,20))
+        im1 = ax.imshow(self.labeled_image, cmap='RdYlBu_r',interpolation=None,origin='lower')
+        plt.colorbar(im1)
+        plt.title('Texture Data with Region labels of connected components')
+        plt.show()
+
+    def color_by_regions(self,num_colors = 10,connectivity=2):
+        if np.unique(self.data).size != 2:
+            raise ValueError("Data must be binary!! - use binarize_data function or something else first")
+        import skimage.measure as measure
+        self.labeled_image = measure.label(self.data,connectivity=connectivity)
+        num_regions = np.max(self.labeled_image)
+        # Create a color map with a different color for each region
+        colors = np.random.randint(1, num_colors+1, size=num_regions)
+        self.colored_image = np.zeros((self.labeled_image.shape[0], self.labeled_image.shape[1]))
+        for i in range(1,num_regions):
+            self.colored_image[self.labeled_image == i] = colors[i]
+
+
+        plt.figure(figsize=(20,20))
+        plt.imshow(self.colored_image, cmap='RdYlBu_r',interpolation=None,origin='lower')
+        plt.colorbar()
+        plt.title('Texture Data with Region labels of connected components')
+        plt.show()
+        self.original_data = self.data.copy()
+        self.data  = self.colored_image
+        self.save_all(extra_tag='colored')
+
+
+    def save(self, filename):
+        with open(filename, 'wb') as f:
+            dill.dump(self, f)
+
+    @classmethod
+    def load(cls, filename):
+        with open(filename, 'rb') as f:
+            return dill.load(f)
 
     def make_save_metrics(self,angles_all = np.arange(0,180,10),bins_chrd=2,plot_fig_chrd=False,r_max=1,sigma=0.5,max_phase=3):
         """

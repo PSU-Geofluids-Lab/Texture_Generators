@@ -466,73 +466,6 @@ class PoresPyGenerator(BaseGenerator):
         else:
             raise ValueError(f"Invalid name: {self.name_method}. Must be one of: [blobs, cylindrical_pillars_array, fractal_noise, random_cantor_dust, random_spheres, overlapping_spheres, polydisperse_spheres, voronoi_edges]")
 
-class USC_TextureGenerator(BaseGenerator):
-    def __init__(self):
-        # Initialize BaseGenerator with the provided name
-        """
-        Initialize a TextureGenerator instance related to the USC Texture Dataset (both rotated and unrotated images).
-        https://sipi.usc.edu/database/database.php?volume=textures&image=10#top
-        Parameters
-        ----------
-        name : str, optional
-            A name for the generator instance. This is used to create a
-            directory name within "Results" to store generated files.
-            Defaults to 'test1'.
-        """
-        self.name = "USC_TextureGenerator/"
-        self.data = None
-        self.metadata = {
-            'generator_type': self.name,  # Use the provided name here
-            'generator_reference': 'https://sipi.usc.edu/database/',  # Use the provided name here
-        }
-        results_folder = os.path.join("Results", self.name) # Use the provided name here
-        self.full_path = results_folder
-
-        folder_path = 'Texture_Files'
-        file_extension = '.tiff'  # Change to the desired extension
-        # Get a list of files in the folder
-        self.files = [file for file in os.listdir(folder_path) if file.endswith(file_extension)]
-        # Print the list of files
-        print('Number of files : '+str(len(self.files)))
-        print('\t'.join(self.files))
-
-
-    def generate(self, file_name):
-        """
-        Generate and load a 2D texture image from a specified file.
-
-        Parameters
-        ----------
-        file_name : str
-            The name of the .tiff file to be loaded from the 'Texture_Files/' directory.
-
-        Returns
-        -------
-        data : ndarray
-            The loaded image data, normalized by its maximum value.
-
-        Notes
-        -----
-        The function updates the instance's name and full_path attributes to include the file name.
-        It creates a directory for saving generated files if it does not already exist.
-        The image shape and file name are added to the metadata.
-        """
-        self.name = self.name+'/'+file_name
-        self.full_path  = self.full_path+file_name 
-        os.makedirs(self.full_path, exist_ok=True)
-        # Set the full path for the generator instance's saved files
-        # This assumes the name is used as the directory name within "Results"
-
-        folder_path = 'Texture_Files/'
-        # Load the .tiff file
-        self.data = plt.imread(folder_path+file_name)
-        self.data  = self.data/np.max(self.data)
-        # Print the image shape and data type
-        self.size = self.data.shape
-        self.file_name = file_name
-        self.add_metadata('size', self.size)
-        self.add_metadata('file_name', file_name)
-        return self.data
 
 class Graph_NetworkX_Generators(BaseGenerator):
     def __init__(self,size=128):
@@ -1206,6 +1139,179 @@ class Variogram_PGGenerator(BaseGenerator):
         return self.data
 
 
+class USC_TextureGenerator(BaseGenerator):
+    def __init__(self):
+        # Initialize BaseGenerator with the provided name
+        """
+        Initialize a TextureGenerator instance related to the USC Texture Dataset (both rotated and unrotated images).
+        https://sipi.usc.edu/database/database.php?volume=textures&image=10#top
+        Parameters
+        ----------
+        name : str, optional
+            A name for the generator instance. This is used to create a
+            directory name within "Results" to store generated files.
+            Defaults to 'test1'.
+        """
+        self.name_base = "USC_TextureGenerator/"
+        self.data = None
+        self.metadata = {
+            'generator_type': self.name_base,  # Use the provided name here
+            'generator_reference': 'https://sipi.usc.edu/database/',  # Use the provided name here
+        }
+        results_folder = os.path.join("Results", self.name_base) # Use the provided name here
+        self.full_path_base = results_folder
+
+        folder_path = 'Texture_Files'
+        file_extension = '.tiff'  # Change to the desired extension
+        # Get a list of files in the folder
+        self.files = [file for file in os.listdir(folder_path) if file.endswith(file_extension)]
+        # Print the list of files
+        self.num_files = len(self.files)
+        print('Number of files : '+str(len(self.files)))
+        print('\t'.join(self.files))
+        self.get_indices_of_same_size()
+
+    def get_indices_of_same_size(self):
+        folder_path = 'Texture_Files/'
+        indices = []
+        for i, file in enumerate(self.files):
+            img = plt.imread(folder_path + file)
+            if img.shape == (512, 512):
+                indices.append(i)
+        self.indices_use_stack = np.array(indices)
+
+    
+    def generate(self, count,colorize='None',**kwargs):
+        color_distribution = kwargs.get('color_distribution', 'random')
+        num_colors = kwargs.get('num_colors', 5)
+        binarize_thresh = kwargs.get('binarize_thresh', 25)
+        folder_path = 'Texture_Files/'
+        file_name = self.files[count]
+        # Load the .tiff file
+        self.data = plt.imread(folder_path+file_name)
+        self.data  = self.data/np.max(self.data)
+        if (colorize == 'Single') | (colorize == 'All'):
+            self.binarize_data(percentile_val=binarize_thresh)
+            self.data = self.colorize_data(self.data,distribution=color_distribution, num_colors=num_colors)
+
+        self.name = self.name_base +file_name
+        self.full_path  = self.full_path_base+file_name
+        print(self.full_path)
+        # Set the full path for the generator instance's saved files
+        # This assumes the name is used as the directory name within "Results"
+        os.makedirs(self.full_path, exist_ok=True)
+
+        # Print the image shape and data type
+        self.size = self.data.shape
+        self.file_name = file_name
+        self.add_metadata('size', self.size)
+        self.add_metadata('file_name', self.file_name)
+        self.porosity = np.sum(self.data)/self.data.size
+        self.add_metadata('porosity',self.porosity)
+        self.add_metadata('Image_Count', count)
+        self.add_metadata('Full_Name', self.name)
+        print(self.metadata)
+        self.total_img_pixels = np.shape(self.data.flatten())
+        return self.data
+
+    def generate_complex(self, merge_mode='single',num_datasets=5,colorize='None',**kwargs):
+        color_distribution = kwargs.get('color_distribution', 'random')
+        num_colors = kwargs.get('num_colors', 5)
+        binarize_thresh = kwargs.get('binarize_thresh', 25)
+        folder_path = 'Texture_Files/'
+        # Merge the datasets together
+        if merge_mode == 'side_by_side':
+            count = np.random.choice(np.arange(0, np.shape(self.indices_use_stack)[0]), size=num_datasets, replace=True)
+            count = self.indices_use_stack[count]
+            # Load the .tiff file
+            data_start = plt.imread(folder_path+self.files[count[0]])
+            data_start  = data_start/np.max(data_start)
+            if colorize == 'Single':
+                data_start = self.binarize_data_basic(data_start,percentile_val=binarize_thresh)
+                data_start[data_start==1] = 1
+
+            for i in range(1,num_datasets):
+                data_start_tmp = plt.imread(folder_path+self.files[count[i]])
+                data_start_tmp  = data_start_tmp/np.max(data_start_tmp)
+                if colorize == 'Single':
+                    data_start_tmp = self.binarize_data_basic(data_start_tmp,percentile_val=binarize_thresh)
+                    data_start_tmp[data_start_tmp==1] = i+1
+                print(data_start.shape,data_start_tmp.shape)
+                data_start = np.hstack([data_start,data_start_tmp])
+            if colorize == 'All':
+                data_start = self.binarize_data_basic(data_start,percentile_val=binarize_thresh)
+                data_start = self.colorize_data(data_start,distribution=color_distribution, num_colors=num_colors)
+            self.data = data_start
+        elif merge_mode == 'vertical':
+            count = np.random.choice(np.arange(0, np.shape(self.indices_use_stack)[0]), size=num_datasets, replace=True)
+            count = self.indices_use_stack[count]
+            # Load the .tiff file
+            data_start = plt.imread(folder_path+self.files[count[0]])
+            data_start  = data_start/np.max(data_start)
+            if colorize == 'Single':
+                data_start = self.binarize_data_basic(data_start,percentile_val=binarize_thresh)
+                data_start[data_start==1] = 1
+
+            for i in range(1,num_datasets):
+                data_start_tmp = plt.imread(folder_path+self.files[count[i]])
+                data_start_tmp  = data_start_tmp/np.max(data_start_tmp)
+                if colorize == 'Single':
+                    data_start_tmp = self.binarize_data_basic(data_start_tmp,percentile_val=binarize_thresh)
+                    data_start_tmp[data_start_tmp==1] = i+1
+                data_start = np.vstack([data_start,data_start_tmp])
+            if colorize == 'All':
+                data_start = self.binarize_data_basic(data_start,percentile_val=binarize_thresh)
+                data_start = self.colorize_data(data_start,distribution=color_distribution, num_colors=num_colors)
+            self.data = data_start
+        elif merge_mode == 'square':
+            sqrt_num_datasets = int(np.sqrt(num_datasets))
+            if sqrt_num_datasets ** 2 != num_datasets:
+                num_datasets = (sqrt_num_datasets + 1) ** 2
+                print(f"num_datasets increased to {num_datasets} to make it a square number")
+
+            sqrt_num_datasets = int(np.sqrt(num_datasets))
+            count = np.random.choice(np.arange(0, np.shape(self.indices_use_stack)[0]), size=num_datasets, replace=True)
+            count = self.indices_use_stack[count]
+            data_start = plt.imread(folder_path+self.files[count[0]])
+            merged_data = np.zeros((data_start.shape[0]* sqrt_num_datasets, data_start.shape[1] * sqrt_num_datasets))
+            datasets = [plt.imread(folder_path+self.files[count[i]]) for i in range(num_datasets)]
+            for i, dataset in enumerate(datasets):
+                row = i // sqrt_num_datasets
+                col = i % sqrt_num_datasets
+                dataset  = dataset/np.max(dataset)
+                if colorize == 'Single':
+                    dataset = self.binarize_data_basic(dataset,percentile_val=binarize_thresh)
+                    dataset[dataset==1] = i+1
+                merged_data[row * data_start.shape[0]:(row + 1) * data_start.shape[0], col * data_start.shape[1]:(col + 1) * data_start.shape[1]] = dataset
+            if colorize == 'All':
+                merged_data = self.binarize_data_basic(merged_data,percentile_val=binarize_thresh)
+                merged_data = self.colorize_data(merged_data,distribution=color_distribution, num_colors=num_colors)
+            self.data = merged_data
+        else:
+            raise ValueError("Invalid merge mode. Must be 'side_by_side' or 'square'.")
+
+        self.name = self.name_base+'/'+merge_mode+'_'+str(num_datasets)+'/'+str(count)
+        self.full_path  = self.full_path_base+'/'+merge_mode+'_'+str(num_datasets)+'/'+str(count)
+        print(self.full_path)
+        # Set the full path for the generator instance's saved files
+        # This assumes the name is used as the directory name within "Results"
+        os.makedirs(self.full_path, exist_ok=True)
+        np.savetxt(self.full_path+'/file_names.txt', [self.files[count1] for count1 in count], fmt='%s')
+
+        # Print the image shape and data type
+        self.size = self.data.shape
+        self.file_name = [self.files[count1] for count1 in count]
+        self.add_metadata('size', self.size)
+        self.add_metadata('file_name', [self.files[count1] for count1 in count])
+        self.porosity = np.sum(self.data)/self.data.size
+        self.add_metadata('porosity',self.porosity)
+        self.add_metadata('Image_Count', count)
+        self.add_metadata('Full_Name', self.name)
+        print(self.metadata)
+        self.total_img_pixels = np.shape(self.data.flatten())
+        return self.data
+
+
 class Micro2D_Generator(BaseGenerator):
     def __init__(self):
         # Initialize BaseGenerator with the provided name
@@ -1218,14 +1324,14 @@ class Micro2D_Generator(BaseGenerator):
             directory name within "Results" to store generated files.
             Defaults to 'test1'.
         """
-        self.name = "Micro2D_Generator/"
+        self.name_base = "Micro2D_Generator/"
         self.data = None
         self.metadata = {
-            'generator_type': self.name,  # Use the provided name here
+            'generator_type': self.name_base,  # Use the provided name here
             'generator_reference': '# https://arobertson38.github.io/MICRO2D/',  # Use the provided name here
         }
-        results_folder = os.path.join("Results", self.name) # Use the provided name here
-        self.full_path = results_folder
+        results_folder = os.path.join("Results", self.name_base) # Use the provided name here
+        self.full_path_base = results_folder
         self.base_file_path = 'Texture_Files_Micro2D/MICRO2D_homogenized.h5'
         # Print the list of files
         with h5py.File(self.base_file_path, 'r') as f:
@@ -1235,38 +1341,120 @@ class Micro2D_Generator(BaseGenerator):
         print('Look at the Dataset_Dropbox.txt file for the full dataset link to download into Texture_Files_Micro2D folder')
 
     def find_num_files(self):
+        """
+        Finds the number of images in each type of dataset in the Micro2D database
+        
+        Parameters
+        ----------
+        None
+        
+        Returns
+        -------
+        None
+        """
         file_count = {}
         f=h5py.File(self.base_file_path, 'r')
         for file_name in self.allowed_names:
             dataset = f[file_name]
             print(f'Number of Images {file_name} : {dataset[file_name].shape[0]}')
             file_count[file_name] = dataset[file_name].shape[0]
+        f.close()
 
-    def generate(self, file_name,count=0):
+    
+    def generate(self, file_name,count=0,merge_mode='single',num_datasets=5,colorize='None',**kwargs):
         """
-        Generate and load a 2D texture image from a specified file.
-
+        Generate a 2D image from a specified dataset in the Micro2D database
         Parameters
         ----------
         file_name : str
-            The name of the .tiff file to be loaded from the 'Texture_Files/' directory.
-
+            The name of the dataset to be loaded from the 'Texture_Files_Micro2D/' directory.
+        count: int,optional
+            The index of the image in the dataset to be loaded
+        merge_mode: str,optional
+            The mode of merging datasets. Must be one of 'single', 'side_by_side', 'vertical', or 'square'.
+        num_datasets : int,optional
+            The number of datasets to be merged.
+        colorize : str,optional
+            The mode of colorizing the image. Must be one of 'Single' or 'All'. If 'Single', the image is colorized with one color per image 
+            If 'All', the image is colorized with the same distribution for all datasets in the merged image.
+        **kwargs:
+            Additional keyword arguments to be passed to colorize_data
         Returns
         -------
         data : ndarray
             The loaded image data, normalized by its maximum value.
-
         """
         if file_name not in self.allowed_names:
             raise Exception(f"Invalid name: {file_name}, mistake? Choose from {self.allowed_names}")
         f=h5py.File(self.base_file_path, 'r')
         dataset = f[file_name]
         print(f'Number of Images : {dataset[file_name].shape[0]}')
-        self.name = self.name+'/'+file_name
-        self.full_path  = self.full_path+file_name 
-        os.makedirs(self.full_path, exist_ok=True)
-        self.data = dataset[file_name][count]
+        color_distribution = kwargs.get('color_distribution', 'random')
+        num_colors = kwargs.get('num_colors', 5)
+        if merge_mode != 'single':
+            # Merge the datasets together
+            if merge_mode == 'side_by_side':
+                count = np.random.randint(0, dataset[file_name].shape[0], size=num_datasets)
+                data_start = dataset[file_name][count[0]]
+                if colorize == 'Single':
+                    data_start[data_start==1] = 1
+                for i in range(1,num_datasets):
+                    data_start_tmp = dataset[file_name][count[i]]
+                    if colorize == 'Single':
+                        data_start_tmp[data_start_tmp==1] = i+1
+                    data_start = np.hstack([data_start,data_start_tmp])
+                if colorize == 'All':
+                    data_start = self.colorize_data(data_start,distribution=color_distribution, num_colors=num_colors)
+                self.data = data_start
+            elif merge_mode == 'vertical':
+                count = np.random.randint(0, dataset[file_name].shape[0], size=num_datasets)
+                data_start = dataset[file_name][count[0]]
+                if colorize == 'Single':
+                    data_start[data_start==1] = 1
+                for i in range(1,num_datasets):
+                    data_start_tmp = dataset[file_name][count[i]]
+                    if colorize == 'Single':
+                        data_start_tmp[data_start_tmp==1] = i+1
+                    data_start = np.vstack([data_start,data_start_tmp])
+                if colorize == 'All':
+                    data_start = self.colorize_data(data_start,distribution=color_distribution, num_colors=num_colors)
+                self.data = data_start                
+            elif merge_mode == 'square':
+                sqrt_num_datasets = int(np.sqrt(num_datasets))
+                if sqrt_num_datasets ** 2 != num_datasets:
+                    num_datasets = (sqrt_num_datasets + 1) ** 2
+                    print(f"num_datasets increased to {num_datasets} to make it a square number")
 
+                sqrt_num_datasets = int(np.sqrt(num_datasets))
+                count = np.random.randint(0, dataset[file_name].shape[0], size=num_datasets)
+                data_start = dataset[file_name][count[0]]
+                merged_data = np.zeros((data_start.shape[0]* sqrt_num_datasets, data_start.shape[1] * sqrt_num_datasets))
+                datasets = [dataset[file_name][count[i]] for i in range(num_datasets)]
+                for i, dataset in enumerate(datasets):
+                    row = i // sqrt_num_datasets
+                    col = i % sqrt_num_datasets
+                    if colorize == 'Single':
+                        dataset[dataset==1] = i+1
+                    merged_data[row * data_start.shape[0]:(row + 1) * data_start.shape[0], col * data_start.shape[1]:(col + 1) * data_start.shape[1]] = dataset
+                if colorize == 'All':
+                    merged_data = self.colorize_data(merged_data,distribution=color_distribution, num_colors=num_colors)
+                self.data = merged_data
+            else:
+                raise ValueError("Invalid merge mode. Must be 'side_by_side' or 'square'.")
+        else: 
+            self.data = dataset[file_name][count]
+            if (colorize == 'Single') | (colorize == 'All'):
+                self.data = self.colorize_data(self.data,distribution=color_distribution, num_colors=num_colors)
+
+        if merge_mode == 'single':
+            self.name = self.name_base+file_name +'/'+str(count)+'_'+merge_mode
+            self.full_path  = self.full_path_base+file_name+'/'+str(count)+'_'+merge_mode 
+        else : 
+            self.name = self.name_base+'/'+file_name +'/'+merge_mode+'_'+str(num_datasets)+'/'+str(count)
+            self.full_path  = self.full_path_base+file_name +'/'+merge_mode+'_'+str(num_datasets)+'/'+str(count)
+        print(self.full_path)
+        os.makedirs(self.full_path, exist_ok=True)
+        
         # Print the image shape and data type
         self.size = self.data.shape
         self.file_name = file_name
@@ -1275,5 +1463,28 @@ class Micro2D_Generator(BaseGenerator):
         self.add_metadata('size', self.size)
         self.add_metadata('file_name', file_name)
         self.add_metadata('Image_Count', count)
+        self.add_metadata('Full_Name', self.name)
+        f.close()
+        print(self.metadata)
+        self.total_img_pixels = np.shape(self.data.flatten())
         return self.data
+
+
+    def delete_from_hdf5(self):
+        f = h5py.File(self.base_file_path, 'r+')
+        for name in self.allowed_names:
+            print('name')
+            dataset = f[name]
+            try :
+                dataset.__delitem__('homogenized_mechanical')
+                dataset.__delitem__('time_mechanical')
+                dataset.__delitem__('time_thermal')
+                dataset.__delitem__('homogenized_thermal')
+            except :
+                print('deleted already')
+        f.close()
+        
+    ## also allow random merging of images
+
+
 
